@@ -6,8 +6,33 @@ export interface ElectronAPI {
   fileExists: (path: string) => Promise<boolean>;
   getLaunchConfig: () => Promise<Record<string, unknown> | null>;
   getWorkspaceRoot: () => Promise<string>;
+  setWorkspaceRoot: (root: string) => Promise<string>;
   pathResolve: (...paths: string[]) => Promise<string>;
   pathJoin: (...paths: string[]) => Promise<string>;
+  
+  // Folder operations
+  openFolder: () => Promise<void>;
+  onFolderOpened: (callback: (path: string) => void) => () => void;
+  onWorkspaceChanged: (callback: (path: string) => void) => () => void;
+  
+  // Debug session
+  debugStart: (config: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
+  debugStop: () => Promise<{ success: boolean }>;
+  debugContinue: () => Promise<{ success: boolean }>;
+  debugStepOver: () => Promise<{ success: boolean }>;
+  debugStepInto: () => Promise<{ success: boolean }>;
+  debugStepOut: () => Promise<{ success: boolean }>;
+  debugPause: () => Promise<{ success: boolean }>;
+  debugSetBreakpoints: (filePath: string, lines: number[]) => Promise<{ success: boolean }>;
+  debugIsActive: () => Promise<boolean>;
+  
+  // DAP Events
+  onDapStopped: (callback: (event: unknown) => void) => () => void;
+  onDapStackTrace: (callback: (body: unknown) => void) => () => void;
+  onDapScopes: (callback: (body: unknown) => void) => () => void;
+  onDapVariables: (callback: (data: unknown) => void) => () => void;
+  onDapTerminated: (callback: () => void) => () => void;
+  onDapExited: (callback: () => void) => () => void;
   
   // Adapter management
   getAdapterCatalog: () => Promise<AdapterInfo[]>;
@@ -41,8 +66,66 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fileExists: (path: string) => ipcRenderer.invoke('file-exists', path),
   getLaunchConfig: () => ipcRenderer.invoke('get-launch-config'),
   getWorkspaceRoot: () => ipcRenderer.invoke('get-workspace-root'),
+  setWorkspaceRoot: (root: string) => ipcRenderer.invoke('set-workspace-root', root),
   pathResolve: (...paths: string[]) => ipcRenderer.invoke('path-resolve', ...paths),
   pathJoin: (...paths: string[]) => ipcRenderer.invoke('path-join', ...paths),
+  
+  // Folder operations
+  openFolder: () => ipcRenderer.invoke('open-folder'),
+  onFolderOpened: (callback: (path: string) => void) => {
+    const handler = (_event: unknown, path: string) => callback(path);
+    ipcRenderer.on('folder-opened', handler);
+    return () => ipcRenderer.removeListener('folder-opened', handler);
+  },
+  onWorkspaceChanged: (callback: (path: string) => void) => {
+    const handler = (_event: unknown, path: string) => callback(path);
+    ipcRenderer.on('workspace-changed', handler);
+    return () => ipcRenderer.removeListener('workspace-changed', handler);
+  },
+  
+  // Debug session
+  debugStart: (config: Record<string, unknown>) => ipcRenderer.invoke('debug-start', config),
+  debugStop: () => ipcRenderer.invoke('debug-stop'),
+  debugContinue: () => ipcRenderer.invoke('debug-continue'),
+  debugStepOver: () => ipcRenderer.invoke('debug-step-over'),
+  debugStepInto: () => ipcRenderer.invoke('debug-step-into'),
+  debugStepOut: () => ipcRenderer.invoke('debug-step-out'),
+  debugPause: () => ipcRenderer.invoke('debug-pause'),
+  debugSetBreakpoints: (filePath: string, lines: number[]) => 
+    ipcRenderer.invoke('debug-set-breakpoints', filePath, lines),
+  debugIsActive: () => ipcRenderer.invoke('debug-is-active'),
+  
+  // DAP Events
+  onDapStopped: (callback: (event: unknown) => void) => {
+    const handler = (_event: unknown, data: unknown) => callback(data);
+    ipcRenderer.on('dap-stopped', handler);
+    return () => ipcRenderer.removeListener('dap-stopped', handler);
+  },
+  onDapStackTrace: (callback: (body: unknown) => void) => {
+    const handler = (_event: unknown, data: unknown) => callback(data);
+    ipcRenderer.on('dap-stack-trace', handler);
+    return () => ipcRenderer.removeListener('dap-stack-trace', handler);
+  },
+  onDapScopes: (callback: (body: unknown) => void) => {
+    const handler = (_event: unknown, data: unknown) => callback(data);
+    ipcRenderer.on('dap-scopes', handler);
+    return () => ipcRenderer.removeListener('dap-scopes', handler);
+  },
+  onDapVariables: (callback: (data: unknown) => void) => {
+    const handler = (_event: unknown, data: unknown) => callback(data);
+    ipcRenderer.on('dap-variables', handler);
+    return () => ipcRenderer.removeListener('dap-variables', handler);
+  },
+  onDapTerminated: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('dap-terminated', handler);
+    return () => ipcRenderer.removeListener('dap-terminated', handler);
+  },
+  onDapExited: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('dap-exited', handler);
+    return () => ipcRenderer.removeListener('dap-exited', handler);
+  },
   
   // Adapter management
   getAdapterCatalog: () => ipcRenderer.invoke('get-adapter-catalog'),

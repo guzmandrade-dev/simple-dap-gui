@@ -1,12 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DebugProtocol } from '@vscode/debugprotocol';
-import { DebugSession } from '../dap/session';
 import { LaunchConfiguration } from '../dap/types';
 
 interface DebugState {
   // Session state
-  session: DebugSession | null;
   isSessionActive: boolean;
   isPaused: boolean;
 
@@ -52,16 +50,12 @@ interface DebugState {
   removeBreakpoint: (file: string, line: number) => Promise<void>;
   toggleBreakpointEnabled: (file: string, line: number) => void;
   isBreakpointEnabled: (file: string, line: number) => boolean;
-
-  // Path mapping
-  serverToLocalPath: (serverPath: string) => string;
 }
 
 export const useDebugStore = create<DebugState>()(
   persist(
     (set, get) => ({
       // Initial state
-      session: null,
       isSessionActive: false,
       isPaused: false,
       threads: [],
@@ -82,57 +76,59 @@ export const useDebugStore = create<DebugState>()(
         if (window.electronAPI) {
           const root = await window.electronAPI.getWorkspaceRoot();
           set({ workspaceRoot: root });
+          
+          // Setup DAP event listeners
+          window.electronAPI.onDapStopped((event) => {
+            get().onStopped(event as DebugProtocol.StoppedEvent['body']);
+          });
+        
+          window.electronAPI.onDapStackTrace((body) => {
+            get().onStackTrace(body as DebugProtocol.StackTraceResponse['body']);
+          });
+        
+          window.electronAPI.onDapScopes((body) => {
+            get().onScopes(body as DebugProtocol.ScopesResponse['body']);
+          });
+        
+          window.electronAPI.onDapVariables((data) => {
+            get().onVariables(data as { frameId: number; scopeId: number; variables: DebugProtocol.Variable[] });
+          });
+          
+          window.electronAPI.onDapTerminated(() => {
+            get().stopSession();
+          });
+          
+          window.electronAPI.onDapExited(() => {
+            get().stopSession();
+          });
         }
       },
 
       startSession: async (config) => {
-        const session = new DebugSession(config);
-
-        // Get adapter path - for now hardcoded for PHP
-        const adapterPath = './node_modules/vscode-php-debug/out/phpDebug.js';
-
         try {
-          await session.start(adapterPath);
+          const result = await window.electronAPI?.debugStart(config as unknown as Record<string, unknown>);
+          
+          if (result.success) {
+            set({ 
+              isSessionActive: true,
+              isPaused: false,
+              threads: [],
+              stackFrames: [],
+              scopes: [],
+              variables: new Map(),
+              currentThreadId: undefined,
+              currentFrameId: undefined,
+              currentFile: undefined,
+              currentLine: undefined,
+            });
 
-          set({
-            session,
-            isSessionActive: true,
-            isPaused: false,
-            threads: [],
-            stackFrames: [],
-            scopes: [],
-            variables: new Map(),
-            currentThreadId: undefined,
-            currentFrameId: undefined,
-            currentFile: undefined,
-            currentLine: undefined,
-          });
-
-          // Subscribe to events
-          session.client.on('stopped', (event) => get().onStopped(event));
-          session.client.on('stackTrace', (body) => get().onStackTrace(body));
-          session.client.on('scopes', (body) => get().onScopes(body));
-          session.client.on('variables', (data) => get().onVariables(data));
-          session.client.on('terminated', () => {
-            get().stopSession();
-          });
-          session.client.on('exited', () => {
-            get().stopSession();
-          });
-
-          // Send initial breakpoints
-          const { breakpoints } = get();
-          for (const [file, lines] of breakpoints.entries()) {
-            if (lines.size > 0) {
-              await session.setBreakpoints(file, Array.from(lines));
-            }
+            // Add to recent configs
+            const recent = get().recentConfigs.filter(c => c.name !== config.name);
+            recent.unshift(config);
+            set({ recentConfigs: recent.slice(0, 5) });
+          } else {
+            console.error('Failed to start session:', result.error);
           }
-
-          // Add to recent configs
-          const recent = get().recentConfigs.filter(c => c.name !== config.name);
-          recent.unshift(config);
-          set({ recentConfigs: recent.slice(0, 5) });
-
         } catch (error) {
           console.error('Failed to start session:', error);
           throw error;
@@ -144,10 +140,6 @@ export const useDebugStore = create<DebugState>()(
           isPaused: true,
           currentThreadId: body.threadId,
         });
-
-        if (body.allThreadsStopped) {
-          // Handle multi-threaded
-        }
       },
 
       onStackTrace: (body) => {
@@ -156,18 +148,14 @@ export const useDebugStore = create<DebugState>()(
         // Update current location from top frame
         if (body.stackFrames.length > 0) {
           const topFrame = body.stackFrames[0];
-          const session = get().session;
-
-          // Convert server path to local path
-          let localPath = topFrame.source?.path;
-          if (session && localPath) {
-            localPath = session.serverToLocalPath(localPath);
-          }
-
-          set({
-            currentFile: localPath,
-            currentLine: topFrame.line,
-            currentFrameId: topFrame.id,
+          
+          // Convert server path to local path via IPC
+          window.electronAPI.pathResolve(topFrame.source?.path || '').then(localPath => {
+            set({
+              currentFile: localPath,
+              currentLine: topFrame.line,
+              currentFrameId: topFrame.id,
+            });
           });
         }
       },
@@ -185,18 +173,11 @@ export const useDebugStore = create<DebugState>()(
       },
 
       stopSession: async () => {
-        const { session } = get();
-        if (session) {
-          try {
-            await session.disconnect();
-          } catch (e) {
-            console.error('Error disconnecting:', e);
-          }
-        }
+        await window.electronAPI.debugStop();
         set({
-          session: null,
           isSessionActive: false,
           isPaused: false,
+          threads: [],
           stackFrames: [],
           scopes: [],
           variables: new Map(),
@@ -208,33 +189,28 @@ export const useDebugStore = create<DebugState>()(
       },
 
       continue: async () => {
-        await get().session?.continue();
+        await window.electronAPI.debugContinue();
         set({ isPaused: false });
       },
 
       stepOver: async () => {
-        await get().session?.stepOver();
+        await window.electronAPI.debugStepOver();
       },
 
       stepInto: async () => {
-        await get().session?.stepInto();
+        await window.electronAPI.debugStepInto();
       },
 
       stepOut: async () => {
-        await get().session?.stepOut();
+        await window.electronAPI.debugStepOut();
       },
 
       pause: async () => {
-        await get().session?.pause();
+        await window.electronAPI.debugPause();
       },
 
       selectFrame: (frameId: number) => {
         set({ currentFrameId: frameId });
-        // Fetch variables for this frame
-        const frame = get().stackFrames.find(f => f.id === frameId);
-        if (frame && get().session) {
-          // This would trigger a variables fetch
-        }
       },
 
       setBreakpoint: async (file: string, line: number) => {
@@ -253,9 +229,8 @@ export const useDebugStore = create<DebugState>()(
         set({ breakpoints, breakpointVerified: verified });
 
         // Send to adapter if session active
-        const session = get().session;
-        if (get().isSessionActive && session) {
-          await session.setBreakpoints(file, Array.from(fileBPs));
+        if (get().isSessionActive) {
+          await window.electronAPI.debugSetBreakpoints(file, Array.from(fileBPs));
         }
       },
 
@@ -280,10 +255,9 @@ export const useDebugStore = create<DebugState>()(
 
         set({ breakpoints, breakpointVerified: verified });
 
-        const session = get().session;
-        if (get().isSessionActive && session) {
+        if (get().isSessionActive) {
           const lines = breakpoints.get(file) || new Set();
-          await session.setBreakpoints(file, Array.from(lines));
+          await window.electronAPI.debugSetBreakpoints(file, Array.from(lines));
         }
       },
 
@@ -301,14 +275,6 @@ export const useDebugStore = create<DebugState>()(
       isBreakpointEnabled: (file: string, line: number) => {
         const fileBPs = get().breakpoints.get(file);
         return fileBPs?.has(line) || false;
-      },
-
-      serverToLocalPath: (serverPath: string): string => {
-        const session = get().session;
-        if (session) {
-          return session.serverToLocalPath(serverPath);
-        }
-        return serverPath;
       },
     }),
     {
