@@ -25,7 +25,7 @@ export interface ElectronAPI {
   execCommand: (command: string) => Promise<{ stdout: string; stderr: string }>;
   
   // Debug session
-  debugStart: (config: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
+  debugStart: (config: Record<string, unknown>, initialBreakpoints?: [string, number[]][]) => Promise<{ success: boolean; error?: string }>;
   debugStop: () => Promise<{ success: boolean }>;
   debugContinue: () => Promise<{ success: boolean }>;
   debugStepOver: () => Promise<{ success: boolean }>;
@@ -102,7 +102,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   execCommand: (command: string) => ipcRenderer.invoke('exec-command', command),
   
   // Debug session
-  debugStart: (config: Record<string, unknown>) => ipcRenderer.invoke('debug-start', config),
+  debugStart: (config: Record<string, unknown>, initialBreakpoints?: [string, number[]][]) => ipcRenderer.invoke('debug-start', config, initialBreakpoints),
   debugStop: () => ipcRenderer.invoke('debug-stop'),
   debugContinue: () => ipcRenderer.invoke('debug-continue'),
   debugStepOver: () => ipcRenderer.invoke('debug-step-over'),

@@ -53,8 +53,8 @@ export function AdapterManagerPanel() {
 
   if (isLoading) {
     return (
-      <div className="p-4 text-gray-400">
-        <div className="animate-pulse">Loading adapters...</div>
+      <div className="p-4 text-secondary">
+        <div>Loading adapters...</div>
       </div>
     );
   }
@@ -62,10 +62,10 @@ export function AdapterManagerPanel() {
   return (
     <div className="p-2">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-bold text-gray-400 uppercase">Debug Adapters</h3>
+        <h3 className="text-xs font-bold text-secondary uppercase">Debug Adapters</h3>
         <button 
           onClick={loadAdapters}
-          className="text-xs text-blue-400 hover:text-blue-300"
+          className="text-xs text-accent"
           title="Refresh"
         >
           ↻ Refresh
@@ -73,11 +73,11 @@ export function AdapterManagerPanel() {
       </div>
 
       {error && (
-        <div className="mb-3 p-2 bg-red-900/50 border border-red-700 rounded text-xs text-red-200">
+        <div className="mb-3 p-2 border border-danger text-xs text-danger">
           {error}
           <button 
             onClick={() => setError(null)}
-            className="ml-2 text-red-400 hover:text-red-300"
+            className="ml-2 text-danger"
           >
             ×
           </button>
@@ -88,28 +88,28 @@ export function AdapterManagerPanel() {
         {adapters.map((adapter) => (
           <div 
             key={adapter.id}
-            className={`p-2 rounded border ${
+            className={`p-2 border ${
               adapter.installed 
-                ? 'bg-green-900/20 border-green-800' 
-                : 'bg-gray-800 border-gray-700'
+                ? 'border-success bg-panel' 
+                : 'border-border bg-panel'
             }`}
           >
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="font-medium text-sm text-gray-200">
+                <div className="font-medium text-sm text-text">
                   {adapter.name}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-muted">
                   {adapter.publisher} • v{adapter.version}
                 </div>
-                <div className="text-xs text-gray-400 mt-1">
+                <div className="text-xs text-secondary mt-1">
                   {adapter.description}
                 </div>
                 <div className="flex items-center gap-2 mt-2">
                   {adapter.supportedLanguages.map(lang => (
                     <span 
                       key={lang}
-                      className="px-1.5 py-0.5 bg-gray-700 rounded text-xs text-gray-300"
+                      className="px-1.5 py-0.5 bg-elevated text-xs text-secondary"
                     >
                       {lang}
                     </span>
@@ -121,7 +121,7 @@ export function AdapterManagerPanel() {
                 {adapter.installed ? (
                   <button
                     onClick={() => handleUninstall(adapter.id)}
-                    className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded"
+                    className="px-2 py-1 bg-danger text-text text-xs"
                     disabled={installing === adapter.id}
                   >
                     {installing === adapter.id ? '...' : 'Uninstall'}
@@ -129,7 +129,7 @@ export function AdapterManagerPanel() {
                 ) : (
                   <button
                     onClick={() => handleInstall(adapter.id)}
-                    className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded"
+                    className="px-2 py-1 bg-accent text-text text-xs"
                     disabled={installing === adapter.id}
                   >
                     {installing === adapter.id ? 'Installing...' : 'Install'}
@@ -139,7 +139,7 @@ export function AdapterManagerPanel() {
             </div>
             
             {adapter.installed && (
-              <div className="mt-2 text-xs text-green-400 flex items-center gap-1">
+              <div className="mt-2 text-xs text-success flex items-center gap-1">
                 <span>✓</span>
                 <span>Installed</span>
               </div>
@@ -149,7 +149,7 @@ export function AdapterManagerPanel() {
       </div>
 
       {adapters.length === 0 && (
-        <div className="text-center py-4 text-gray-500 text-sm">
+        <div className="text-center py-4 text-muted text-sm">
           No adapters available
         </div>
       )}

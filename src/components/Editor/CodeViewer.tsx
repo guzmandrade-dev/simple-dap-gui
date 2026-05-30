@@ -2,6 +2,7 @@ import Editor, { OnMount } from '@monaco-editor/react';
 import { useEffect, useRef, useState } from 'react';
 import { useEditorStore } from '../../stores/editorStore';
 import { useDebugStore } from '../../stores/debugStore';
+import { useConfigStore } from '../../stores/configStore';
 import { getLanguageForFile, fetchFileContent } from '../../utils/fileLoader';
 
 interface Settings {
@@ -32,8 +33,8 @@ export function CodeViewer({ className }: CodeViewerProps) {
     setBreakpoint, 
     removeBreakpoint 
   } = useDebugStore();
+  const { theme } = useConfigStore();
 
-  // Load settings
   useEffect(() => {
     const saved = localStorage.getItem('dapdesk-settings');
     if (saved) {
@@ -65,7 +66,6 @@ export function CodeViewer({ className }: CodeViewerProps) {
     editorRef.current = editor;
     monacoRef.current = monaco;
 
-    // Click gutter to toggle breakpoint
     editor.onMouseDown((e: any) => {
       const targetType = e.target.type;
       if (
@@ -87,7 +87,6 @@ export function CodeViewer({ className }: CodeViewerProps) {
     });
   };
 
-  // Load file when currentFile changes
   useEffect(() => {
     if (!currentFile) return;
     
@@ -107,7 +106,6 @@ export function CodeViewer({ className }: CodeViewerProps) {
     }
   }, [currentFile]);
 
-  // Update decorations when state changes
   useEffect(() => {
     if (!editorRef.current || !monacoRef.current || !currentFile) return;
     
@@ -117,27 +115,24 @@ export function CodeViewer({ className }: CodeViewerProps) {
     
     if (!model) return;
 
-    // Clear previous decorations
     if (decorationsRef.current.length > 0) {
       editor.deltaDecorations(decorationsRef.current, []);
     }
 
     const newDecorations: any[] = [];
     
-    // Add breakpoint decorations
     const fileBPs = breakpoints.get(currentFile) || new Set();
     fileBPs.forEach(line => {
       newDecorations.push({
         range: new monaco.Range(line, 1, line, 1),
         options: {
           glyphMarginClassName: 'breakpoint-glyph',
-          overviewRuler: { color: '#ff4444', position: 1 },
-          minimap: { color: '#ff4444', position: 1 },
+          overviewRuler: { color: '#dc2626', position: 1 },
+          minimap: { color: '#dc2626', position: 1 },
         }
       });
     });
     
-    // Add current line decoration if paused
     if (isPaused && currentLine) {
       newDecorations.push({
         range: new monaco.Range(currentLine, 1, currentLine, 1),
@@ -148,7 +143,6 @@ export function CodeViewer({ className }: CodeViewerProps) {
         }
       });
       
-      // Center on current line
       editor.revealLineInCenter(currentLine);
     }
 
@@ -161,7 +155,7 @@ export function CodeViewer({ className }: CodeViewerProps) {
 
   if (!currentFile) {
     return (
-      <div className={`${className} flex items-center justify-center bg-gray-900 text-gray-500`}>
+      <div className={`${className} flex items-center justify-center bg-surface text-muted`}>
         <div className="text-center">
           <div className="text-4xl mb-2">📁</div>
           <div>No file open</div>
@@ -174,14 +168,13 @@ export function CodeViewer({ className }: CodeViewerProps) {
   return (
     <div className={className}>
       <div className="h-full flex flex-col">
-        {/* File header */}
-        <div className="h-9 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-3 flex-shrink-0">
+        <div className="h-9 bg-panel border-b border-border flex items-center justify-between px-3 flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-gray-400 text-sm truncate" title={currentFile}>
+            <span className="text-secondary text-sm truncate" title={currentFile}>
               {fileName}
             </span>
             {currentLine && (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-muted">
                 :{currentLine}
               </span>
             )}
@@ -189,7 +182,7 @@ export function CodeViewer({ className }: CodeViewerProps) {
           
           <button
             onClick={openInEditor}
-            className="flex items-center gap-1.5 px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+            className="flex items-center gap-1.5 px-2 py-1 text-xs bg-elevated text-secondary"
             title={`Open in ${settings.editorCommand}`}
           >
             <span>📝</span>
@@ -197,11 +190,10 @@ export function CodeViewer({ className }: CodeViewerProps) {
           </button>
         </div>
         
-        {/* Editor */}
         <div className="flex-1">
           <Editor
             height="100%"
-            theme="vs-dark"
+            theme={theme === 'light' ? 'vs' : 'vs-dark'}
             path={currentFile}
             value={content}
             language={language}

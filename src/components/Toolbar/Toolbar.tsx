@@ -46,50 +46,45 @@ export function Toolbar() {
     const vscodeDir = await window.electronAPI?.pathJoin(root, '.vscode');
     const configPath = await window.electronAPI?.pathJoin(vscodeDir, 'launch.json');
     
-    // Check if already exists
     const exists = await window.electronAPI?.fileExists(configPath);
     if (exists) {
       const overwrite = confirm('launch.json already exists. Overwrite?');
       if (!overwrite) return;
     }
 
-    // Create .vscode directory if needed
     try {
       await window.electronAPI?.createDirectory?.(vscodeDir);
-    } catch (e) {
-      // Directory might already exist
-    }
+    } catch (e) {}
 
-    // Write the file
     const content = JSON.stringify(DEFAULT_LAUNCH_JSON, null, 2);
     try {
       await window.electronAPI?.writeFile?.(configPath, content);
       alert('launch.json created!');
-      loadConfigs(); // Reload configs
+      loadConfigs();
     } catch (err) {
       alert('Failed to create launch.json: ' + err);
     }
   };
 
   return (
-    <div className="h-12 bg-gray-800 border-b border-gray-700 flex items-center px-4 gap-4">
+    <div className="h-12 bg-panel border-b border-border flex items-center px-4 gap-4">
       <div className="flex gap-2">
         <button 
           onClick={() => window.electronAPI?.openFolder()}
-          className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm font-medium"
+          className="flex items-center gap-2 px-3 py-1.5 bg-elevated text-sm font-medium"
           title="Open Folder (Ctrl+O)"
         >
           <span>📁</span>
           <span>Open</span>
         </button>
         
-        <div className="w-px h-6 bg-gray-700 mx-1"></div>
+        <div className="w-px h-6 bg-border mx-1"></div>
         
         {!isSessionActive ? (
           <button 
             onClick={handleStart}
             disabled={!selectedConfig}
-            className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-sm font-medium"
+            className="flex items-center gap-2 px-3 py-1.5 bg-success disabled:bg-elevated disabled:cursor-not-allowed text-sm font-medium"
           >
             <span>▶</span>
             <span>Debug</span>
@@ -98,7 +93,7 @@ export function Toolbar() {
           <>
             <button 
               onClick={stopSession}
-              className="flex items-center gap-2 px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded text-sm font-medium"
+              className="flex items-center gap-2 px-3 py-1.5 bg-danger text-sm font-medium"
             >
               <span>⏹</span>
               <span>Stop</span>
@@ -108,28 +103,28 @@ export function Toolbar() {
               <>
                 <button 
                   onClick={continueExecution} 
-                  className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 rounded text-sm font-medium"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-success text-sm font-medium"
                 >
                   <span>▶</span>
                   <span>Continue</span>
                 </button>
                 <button 
                   onClick={stepOver} 
-                  className="flex items-center gap-2 px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded text-sm font-medium"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-elevated text-sm font-medium"
                 >
                   <span>⤷</span>
                   <span>Step Over</span>
                 </button>
                 <button 
                   onClick={stepInto} 
-                  className="flex items-center gap-2 px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded text-sm font-medium"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-elevated text-sm font-medium"
                 >
                   <span>⤵</span>
                   <span>Step Into</span>
                 </button>
                 <button 
                   onClick={stepOut} 
-                  className="flex items-center gap-2 px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded text-sm font-medium"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-elevated text-sm font-medium"
                 >
                   <span>⤴</span>
                   <span>Step Out</span>
@@ -138,7 +133,7 @@ export function Toolbar() {
             ) : (
               <button 
                 onClick={pause} 
-                className="flex items-center gap-2 px-3 py-1.5 bg-yellow-600 hover:bg-yellow-500 rounded text-sm font-medium"
+                className="flex items-center gap-2 px-3 py-1.5 bg-warning text-sm font-medium"
               >
                 <span>⏸</span>
                 <span>Pause</span>
@@ -152,7 +147,7 @@ export function Toolbar() {
         <select
           value={selectedConfig?.name || ''}
           onChange={(e) => selectConfig(e.target.value)}
-          className="flex-1 max-w-md px-3 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm focus:outline-none focus:border-blue-500"
+          className="flex-1 max-w-md px-3 py-1.5 bg-elevated border border-border text-sm focus:outline-none focus:border-accent"
         >
           <option value="">Select configuration...</option>
           {configs.map((config) => (
@@ -165,14 +160,14 @@ export function Toolbar() {
         {configs.length === 0 && (
           <button
             onClick={createLaunchJson}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium whitespace-nowrap"
+            className="px-3 py-1.5 bg-accent text-sm font-medium whitespace-nowrap"
           >
             + Create launch.json
           </button>
         )}
       </div>
       
-      <div className="text-sm text-gray-400">
+      <div className="text-sm text-secondary">
         {isSessionActive && (isPaused ? '⏸ Paused' : '▶ Running')}
       </div>
     </div>

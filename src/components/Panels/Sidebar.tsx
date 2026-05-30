@@ -23,18 +23,17 @@ export function Sidebar({ className }: SidebarProps) {
   ];
 
   return (
-    <div className={`flex flex-col bg-gray-800 h-full ${className}`}>
-      {/* Tab headers - scrollable */}
-      <div className="flex border-b border-gray-700 overflow-x-auto scrollbar-hide">
+    <div className={`flex flex-col bg-panel h-full ${className}`}>
+      <div className="flex border-b border-border overflow-x-auto scrollbar-hide">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             title={tab.title}
-            className={`flex-shrink-0 px-3 py-2 text-xs font-medium uppercase tracking-wider whitespace-nowrap transition-colors ${
+            className={`flex-shrink-0 px-3 py-2 text-xs font-medium uppercase whitespace-nowrap ${
               activeTab === tab.id
-                ? 'bg-gray-700 text-white border-b-2 border-blue-500'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-750'
+                ? 'bg-elevated text-text border-b-2 border-accent'
+                : 'text-secondary'
             }`}
           >
             <span className="mr-1">{tab.icon}</span>
@@ -43,7 +42,6 @@ export function Sidebar({ className }: SidebarProps) {
         ))}
       </div>
 
-      {/* Tab content */}
       <div className="flex-1 overflow-auto">
         {activeTab === 'stack' && <CallStackPanel />}
         {activeTab === 'variables' && <VariablesPanel />}

@@ -43,7 +43,6 @@ export function ResizablePanel({
     setIsResizing(false);
   }, []);
 
-  // Attach global mouse events when resizing
   useEffect(() => {
     if (isResizing) {
       document.addEventListener('mousemove', handleMouseMove);
@@ -73,13 +72,11 @@ export function ResizablePanel({
     >
       {children}
       
-      {/* Resize handle - thin line on the edge */}
       <div
         onMouseDown={handleMouseDown}
         className={`
           absolute top-0 right-0 w-1 h-full cursor-col-resize z-10
-          transition-colors duration-150
-          ${isResizing ? 'bg-blue-500' : 'bg-transparent hover:bg-blue-500/50'}
+          ${isResizing ? 'bg-accent' : 'bg-transparent'}
         `}
         style={{ transform: 'translateX(50%)' }}
       />

@@ -6,6 +6,10 @@ export class DebugSession {
   client: DAPClient;
   private currentThreadId: number | undefined;
   private pathMappings: Record<string, string> = {};
+  private pendingBreakpoints = new Map<string, number[]>();
+  private isInitialized = false;
+  private initializedPromise: Promise<void>;
+  private initializedResolve!: () => void;
 
   constructor(private config: LaunchConfiguration) {
     this.client = new DAPClient();
@@ -15,6 +19,10 @@ export class DebugSession {
     if (config.pathMappings) {
       this.pathMappings = config.pathMappings;
     }
+
+    this.initializedPromise = new Promise((resolve) => {
+      this.initializedResolve = resolve;
+    });
   }
 
   private setupEventHandlers() {
@@ -23,6 +31,25 @@ export class DebugSession {
     this.client.on('breakpoint', this.onBreakpointEvent.bind(this));
     this.client.on('terminated', this.onTerminated.bind(this));
     this.client.on('exited', this.onExited.bind(this));
+    this.client.on('initialized', this.onInitialized.bind(this));
+  }
+
+  private async onInitialized() {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
+    console.log('Adapter initialized event received');
+
+    // Send all pending breakpoints that were queued before initialization
+    for (const [filePath, lines] of this.pendingBreakpoints) {
+      await this.setBreakpoints(filePath, lines);
+    }
+    this.pendingBreakpoints.clear();
+
+    // Notify adapter that configuration is complete so it can start executing
+    await this.client.sendRequest('configurationDone');
+    console.log('Configuration done sent');
+
+    this.initializedResolve();
   }
 
   async start(adapterPath: string) {
@@ -47,6 +74,9 @@ export class DebugSession {
     } else {
       await this.client.sendRequest('attach', this.config);
     }
+
+    // Wait for the adapter to emit 'initialized' and for us to send 'configurationDone'
+    await this.initializedPromise;
   }
 
   private async onStopped(event: DebugProtocol.StoppedEvent['body']) {
@@ -123,6 +153,12 @@ export class DebugSession {
   }
 
   async setBreakpoints(filePath: string, lines: number[]) {
+    // If the adapter hasn't emitted 'initialized' yet, queue the breakpoints
+    if (!this.isInitialized) {
+      this.pendingBreakpoints.set(filePath, lines);
+      return;
+    }
+
     // Convert local path to server path if needed
     const serverPath = this.localToServerPath(filePath);
     
@@ -177,6 +213,8 @@ export class DebugSession {
     try {
       await this.client.sendRequest('disconnect', { restart });
     } finally {
+      // Resolve initialization promise in case we're still waiting during teardown
+      this.initializedResolve();
       this.client.dispose();
     }
   }

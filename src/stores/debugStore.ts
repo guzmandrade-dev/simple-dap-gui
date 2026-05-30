@@ -103,7 +103,14 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
 
   startSession: async (config) => {
     try {
-      const result = await window.electronAPI?.debugStart(config as unknown as Record<string, unknown>);
+      // Collect breakpoints that were set before the session started
+      const breakpoints = get().breakpoints;
+      const initialBreakpoints: [string, number[]][] = [];
+      for (const [file, lines] of breakpoints) {
+        initialBreakpoints.push([file, Array.from(lines)]);
+      }
+
+      const result = await window.electronAPI?.debugStart(config as unknown as Record<string, unknown>, initialBreakpoints);
       
       if (result?.success) {
         set({ 

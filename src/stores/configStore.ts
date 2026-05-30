@@ -5,7 +5,8 @@ interface ConfigState {
   configs: LaunchConfiguration[];
   selectedConfig: LaunchConfiguration | null;
   workspaceRoot: string;
-  
+  theme: 'dark' | 'light';
+
   // Actions
   loadConfigs: () => Promise<void>;
   selectConfig: (name: string) => void;
@@ -13,12 +14,15 @@ interface ConfigState {
   removeConfig: (name: string) => void;
   getSelectedConfig: () => LaunchConfiguration | null;
   setWorkspaceRoot: (root: string) => void;
+  setTheme: (theme: 'dark' | 'light') => void;
+  loadTheme: () => void;
 }
 
 export const useConfigStore = create<ConfigState>()((set, get) => ({
   configs: [],
   selectedConfig: null,
   workspaceRoot: '',
+  theme: 'dark',
 
   loadConfigs: async () => {
     try {
@@ -81,5 +85,18 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
 
   setWorkspaceRoot: (root: string) => {
     set({ workspaceRoot: root });
+  },
+
+  setTheme: (theme: 'dark' | 'light') => {
+    set({ theme });
+    localStorage.setItem('dapdesk-theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+  },
+
+  loadTheme: () => {
+    const saved = localStorage.getItem('dapdesk-theme') as 'dark' | 'light' | null;
+    const theme = saved || 'dark';
+    set({ theme });
+    document.documentElement.setAttribute('data-theme', theme);
   },
 }));

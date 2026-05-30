@@ -4,10 +4,7 @@ export function TitleBar() {
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
-    // Check initial state
-    const checkMaximized = async () => {
-      // We can't easily check this from renderer, so we'll track it via events
-    };
+    const checkMaximized = async () => {};
     checkMaximized();
   }, []);
 
@@ -25,21 +22,15 @@ export function TitleBar() {
   };
 
   return (
-    <div 
-      className="h-8 bg-gray-800 flex items-center justify-between select-none app-drag-region"
-    >
-      {/* App title - draggable area */}
-      <div className="flex-1 px-4 text-sm text-gray-400 font-medium truncate">
+    <div className="h-8 bg-panel flex items-center justify-between select-none app-drag-region">
+      <div className="flex-1 px-4 text-sm text-secondary font-medium truncate">
         DapDesk - DAP Debugger GUI
       </div>
       
-      {/* Window controls - non-draggable */}
-      <div 
-        className="flex items-center app-no-drag-region"
-      >
+      <div className="flex items-center app-no-drag-region">
         <button
           onClick={handleMinimize}
-          className="w-12 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
+          className="w-12 h-8 flex items-center justify-center text-secondary"
           title="Minimize"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
@@ -49,7 +40,7 @@ export function TitleBar() {
         
         <button
           onClick={handleMaximize}
-          className="w-12 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
+          className="w-12 h-8 flex items-center justify-center text-secondary"
           title={isMaximized ? "Restore" : "Maximize"}
         >
           {isMaximized ? (
@@ -65,7 +56,7 @@ export function TitleBar() {
         
         <button
           onClick={handleClose}
-          className="w-12 h-8 flex items-center justify-center text-gray-400 hover:bg-red-600 hover:text-white transition-colors"
+          className="w-12 h-8 flex items-center justify-center text-secondary"
           title="Close"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">

@@ -17,9 +17,16 @@ const getAdaptersDir = () => path.join(app.getPath('userData'), 'adapters');
 class DebugSessionManager {
   private session: DebugSession | null = null;
 
-  async start(config: LaunchConfiguration): Promise<void> {
+  async start(config: LaunchConfiguration, initialBreakpoints?: Map<string, number[]>): Promise<void> {
     this.session = new DebugSession(config);
     
+    // Queue any breakpoints that were set before the session started
+    if (initialBreakpoints) {
+      for (const [filePath, lines] of initialBreakpoints) {
+        this.session.setBreakpoints(filePath, lines);
+      }
+    }
+
     // Get adapter path
     const adapterPath = await this.getAdapterPath(config.type);
     if (!adapterPath) {
@@ -376,9 +383,10 @@ ipcMain.handle('write-file', async (_event, filePath: string, content: string) =
 
 // Debug Session IPC Handlers
 
-ipcMain.handle('debug-start', async (_event, config: LaunchConfiguration) => {
+ipcMain.handle('debug-start', async (_event, config: LaunchConfiguration, initialBreakpoints?: [string, number[]][]) => {
   try {
-    await debugManager.start(config);
+    const breakpoints = initialBreakpoints ? new Map(initialBreakpoints) : undefined;
+    await debugManager.start(config, breakpoints);
     return { success: true };
   } catch (error) {
     return { success: false, error: String(error) };

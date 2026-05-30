@@ -12,7 +12,7 @@ import { ResizablePanel } from './components/ResizablePanel/ResizablePanel';
 
 function App() {
   const { initialize, isSessionActive } = useDebugStore();
-  const { loadConfigs, setWorkspaceRoot } = useConfigStore();
+  const { loadConfigs, setWorkspaceRoot, loadTheme } = useConfigStore();
   const { openFile } = useEditorStore();
   const [explorerWidth, setExplorerWidth] = useState(250);
   const [sidebarWidth, setSidebarWidth] = useState(280);
@@ -20,6 +20,7 @@ function App() {
   useEffect(() => {
     initialize();
     loadConfigs();
+    loadTheme();
 
     // Listen for folder opened events from main process
     const unsubscribeFolder = window.electronAPI?.onFolderOpened((path: string) => {
@@ -54,7 +55,7 @@ function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900 text-gray-100 overflow-hidden">
+    <div className="flex flex-col h-screen bg-surface text-text overflow-hidden">
       <TitleBar />
       
       <Toolbar />

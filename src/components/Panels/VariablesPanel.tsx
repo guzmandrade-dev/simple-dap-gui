@@ -9,7 +9,7 @@ export function VariablesPanel() {
 
   if (!isSessionActive) {
     return (
-      <div className="p-4 text-gray-500 text-sm">
+      <div className="p-4 text-muted text-sm">
         No active debug session
       </div>
     );
@@ -17,7 +17,7 @@ export function VariablesPanel() {
 
   if (!currentFrameId) {
     return (
-      <div className="p-4 text-gray-500 text-sm">
+      <div className="p-4 text-muted text-sm">
         No frame selected
       </div>
     );
@@ -25,7 +25,7 @@ export function VariablesPanel() {
 
   if (frameVariables.length === 0) {
     return (
-      <div className="p-4 text-gray-500 text-sm">
+      <div className="p-4 text-muted text-sm">
         No variables available
       </div>
     );
@@ -33,7 +33,7 @@ export function VariablesPanel() {
 
   return (
     <div className="p-2">
-      <h3 className="text-xs font-bold text-gray-400 uppercase mb-2 px-2">Variables</h3>
+      <h3 className="text-xs font-bold text-secondary uppercase mb-2 px-2">Variables</h3>
       <div className="font-mono text-sm">
         {frameVariables.map((variable) => (
           <VariableTree 
@@ -60,21 +60,21 @@ function VariableTree({ variable, depth }: VariableTreeProps) {
   return (
     <div style={{ marginLeft: depth * 12 }}>
       <div 
-        className="flex items-center gap-1 cursor-pointer hover:bg-gray-800 p-1 rounded"
+        className="flex items-center gap-1 cursor-pointer p-1"
         onClick={() => hasChildren && setExpanded(!expanded)}
       >
         {hasChildren && (
-          <span className="text-gray-500 text-xs w-4">
+          <span className="text-muted text-xs w-4">
             {expanded ? '▼' : '▶'}
           </span>
         )}
         {!hasChildren && <span className="w-4" />}
-        <span className="text-blue-400">{variable.name}</span>
-        <span className="text-gray-500">=</span>
+        <span className="text-accent">{variable.name}</span>
+        <span className="text-muted">=</span>
         <span className={getValueColor(variable.type)}>{variable.value}</span>
       </div>
       {expanded && hasChildren && (
-        <div className="text-gray-400 italic pl-5">
+        <div className="text-secondary italic pl-5">
           {/* Children would be fetched here */}
           [Expandable]
         </div>
@@ -85,13 +85,13 @@ function VariableTree({ variable, depth }: VariableTreeProps) {
 
 function getValueColor(type?: string): string {
   const colors: Record<string, string> = {
-    'string': 'text-green-400',
-    'number': 'text-orange-400',
-    'boolean': 'text-purple-400',
-    'null': 'text-gray-500',
-    'undefined': 'text-gray-500',
-    'object': 'text-yellow-400',
-    'array': 'text-yellow-400',
+    'string': 'text-success',
+    'number': 'text-warning',
+    'boolean': 'text-accent',
+    'null': 'text-muted',
+    'undefined': 'text-muted',
+    'object': 'text-warning',
+    'array': 'text-warning',
   };
-  return colors[type || ''] || 'text-gray-300';
+  return colors[type || ''] || 'text-text';
 }

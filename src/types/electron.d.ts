@@ -36,7 +36,7 @@ export interface ElectronAPI {
   execCommand: (command: string) => Promise<{ stdout: string; stderr: string }>;
   
   // Debug session operations
-  debugStart: (config: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
+  debugStart: (config: Record<string, unknown>, initialBreakpoints?: [string, number[]][]) => Promise<{ success: boolean; error?: string }>;
   debugStop: () => Promise<{ success: boolean }>;
   debugContinue: () => Promise<{ success: boolean }>;
   debugStepOver: () => Promise<{ success: boolean }>;

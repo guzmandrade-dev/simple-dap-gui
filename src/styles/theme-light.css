@@ -1,0 +1,14 @@
+/* Light theme overrides */
+[data-theme="light"] {
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f3f4f6;
+  --color-bg-tertiary: #e5e7eb;
+  --color-text: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-muted: #9ca3af;
+  --color-border: #d1d5db;
+  --color-accent: #2563eb;
+  --color-success: #16a34a;
+  --color-danger: #dc2626;
+  --color-warning: #ca8a04;
+}

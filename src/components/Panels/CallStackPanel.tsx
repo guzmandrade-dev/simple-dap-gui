@@ -6,7 +6,7 @@ export function CallStackPanel() {
 
   if (!isSessionActive) {
     return (
-      <div className="p-4 text-gray-500 text-sm">
+      <div className="p-4 text-muted text-sm">
         No active debug session
       </div>
     );
@@ -14,7 +14,7 @@ export function CallStackPanel() {
 
   if (stackFrames.length === 0) {
     return (
-      <div className="p-4 text-gray-500 text-sm">
+      <div className="p-4 text-muted text-sm">
         No stack frames available
       </div>
     );
@@ -22,16 +22,16 @@ export function CallStackPanel() {
 
   return (
     <div className="p-2">
-      <h3 className="text-xs font-bold text-gray-400 uppercase mb-2 px-2">Call Stack</h3>
+      <h3 className="text-xs font-bold text-secondary uppercase mb-2 px-2">Call Stack</h3>
       <div className="space-y-1">
         {stackFrames.map((frame) => (
           <div
             key={frame.id}
             onClick={() => selectFrame(frame.id)}
-            className={`cursor-pointer p-2 rounded text-sm ${
+            className={`cursor-pointer p-2 text-sm ${
               frame.id === currentFrameId
-                ? 'bg-blue-600 text-white'
-                : 'hover:bg-gray-700 text-gray-200'
+                ? 'bg-accent text-text'
+                : 'text-text'
             }`}
           >
             <div className="font-medium truncate">{frame.name}</div>

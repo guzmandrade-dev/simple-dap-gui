@@ -18,7 +18,6 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
 
-  // Get workspace root on mount
   useEffect(() => {
     const loadRoot = async () => {
       const root = await window.electronAPI?.getWorkspaceRoot();
@@ -29,7 +28,6 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
     loadRoot();
   }, []);
 
-  // Listen for folder opened events
   useEffect(() => {
     const unsubscribe = window.electronAPI?.onFolderOpened((path: string) => {
       setRootPath(path);
@@ -38,7 +36,6 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
     return () => unsubscribe?.();
   }, []);
 
-  // Load files when root changes
   useEffect(() => {
     if (rootPath) {
       loadDirectory(rootPath);
@@ -48,7 +45,6 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
   const loadDirectory = useCallback(async (dirPath: string) => {
     setIsLoading(true);
     try {
-      // Use IPC to read directory
       const result = await window.electronAPI?.readDirectory?.(dirPath);
       if (result) {
         setFiles(result);
@@ -88,13 +84,12 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
           onClick={() => handleFileClick(node)}
           className={`
             flex items-center gap-1 py-1 px-2 cursor-pointer text-sm
-            hover:bg-gray-700/50 transition-colors
-            ${node.isDirectory ? 'text-gray-300' : 'text-gray-400'}
+            ${node.isDirectory ? 'text-text' : 'text-secondary'}
           `}
           style={{ paddingLeft: `${paddingLeft}px` }}
         >
           {node.isDirectory && (
-            <span className="text-gray-500 w-4">
+            <span className="text-muted w-4">
               {isExpanded ? '▼' : '▶'}
             </span>
           )}
@@ -153,14 +148,14 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
 
   if (!rootPath) {
     return (
-      <div className={`${className} bg-gray-800 flex flex-col h-full`}>
-        <div className="p-3 border-b border-gray-700">
-          <h3 className="text-xs font-bold text-gray-400 uppercase">Explorer</h3>
+      <div className={`${className} bg-panel flex flex-col h-full`}>
+        <div className="p-3 border-b border-border">
+          <h3 className="text-xs font-bold text-secondary uppercase">Explorer</h3>
         </div>
-        <div className="flex-1 flex items-center justify-center text-gray-500 text-sm p-4 text-center">
+        <div className="flex-1 flex items-center justify-center text-muted text-sm p-4 text-center">
           No folder opened
           <br />
-          <span className="text-xs text-gray-600">
+          <span className="text-xs text-muted">
             Use File → Open Folder
           </span>
         </div>
@@ -169,18 +164,18 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
   }
 
   return (
-    <div className={`${className} bg-gray-800 flex flex-col h-full`}>
-      <div className="p-3 border-b border-gray-700">
-        <h3 className="text-xs font-bold text-gray-400 uppercase truncate" title={rootPath}>
+    <div className={`${className} bg-panel flex flex-col h-full`}>
+      <div className="p-3 border-b border-border">
+        <h3 className="text-xs font-bold text-secondary uppercase truncate" title={rootPath}>
           {rootPath.split('/').pop() || rootPath}
         </h3>
       </div>
       
       <div className="flex-1 overflow-auto">
         {isLoading ? (
-          <div className="p-4 text-gray-500 text-sm">Loading...</div>
+          <div className="p-4 text-muted text-sm">Loading...</div>
         ) : files.length === 0 ? (
-          <div className="p-4 text-gray-500 text-sm">Empty folder</div>
+          <div className="p-4 text-muted text-sm">Empty folder</div>
         ) : (
           files.map(node => renderNode(node))
         )}
