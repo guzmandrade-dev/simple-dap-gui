@@ -16,11 +16,11 @@ export function BreakpointsPanel() {
 
   return (
     <div className="p-2">
-      <h3 className="text-xs font-bold text-secondary uppercase mb-2 px-2">Breakpoints</h3>
+      <h3 className="text-sm font-bold text-secondary uppercase mb-2 px-2">Breakpoints</h3>
       <div className="space-y-1">
         {breakpointEntries.map(([file, lines]) => (
           <div key={file} className="mb-2">
-            <div className="text-xs text-muted font-medium px-1 truncate" title={file}>
+            <div className="text-sm text-muted font-medium px-1 truncate" title={file}>
               {getFileName(file)}
             </div>
             {Array.from(lines).map(line => (
@@ -32,14 +32,14 @@ export function BreakpointsPanel() {
                   type="checkbox" 
                   checked={isBreakpointEnabled(file, line)}
                   onChange={() => toggleBreakpointEnabled(file, line)}
-                  className="w-3 h-3 accent-accent"
+                  className="w-4 h-4 accent-accent"
                 />
-                <span className="text-xs font-mono text-text flex-1">
+                <span className="text-sm font-mono text-text flex-1">
                   Line {line}
                 </span>
                 <button 
                   onClick={() => removeBreakpoint(file, line)}
-                  className="text-danger text-xs px-1"
+                  className="text-danger text-sm px-1 leading-none flex items-center justify-center hover:bg-elevated rounded"
                   title="Remove breakpoint"
                 >
                   ×

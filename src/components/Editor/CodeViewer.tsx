@@ -23,6 +23,7 @@ export function CodeViewer({ className }: CodeViewerProps) {
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
+  const breakpointsRef = useRef<Map<string, Set<number>>>(new Map());
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   
   const { currentFile, fileContents } = useEditorStore();
@@ -34,6 +35,9 @@ export function CodeViewer({ className }: CodeViewerProps) {
     removeBreakpoint 
   } = useDebugStore();
   const { theme } = useConfigStore();
+
+  // Keep breakpoints ref up to date so the editor mount handler always sees the latest
+  breakpointsRef.current = breakpoints;
 
   useEffect(() => {
     const saved = localStorage.getItem('dapdesk-settings');
@@ -68,14 +72,30 @@ export function CodeViewer({ className }: CodeViewerProps) {
 
     editor.onMouseDown((e: any) => {
       const targetType = e.target.type;
-      if (
+      
+      // Check if click is in gutter area
+      const isGutter = 
         targetType === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
-        targetType === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS
-      ) {
+        targetType === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS;
+      
+      // Check if click is directly on a breakpoint glyph decoration
+      // (Monaco may report a different target type when clicking on custom decorations)
+      let isBreakpointElement = false;
+      let el = e.target.element;
+      const editorDomNode = editor.getDomNode();
+      while (el && el !== editorDomNode) {
+        if (el.classList?.contains('breakpoint-glyph')) {
+          isBreakpointElement = true;
+          break;
+        }
+        el = el.parentElement;
+      }
+      
+      if (isGutter || isBreakpointElement) {
         const line = e.target.position?.lineNumber;
         if (!line || !currentFile) return;
         
-        const fileBPs = breakpoints.get(currentFile) || new Set();
+        const fileBPs = breakpointsRef.current.get(currentFile) || new Set();
         const hasBP = fileBPs.has(line);
         
         if (hasBP) {

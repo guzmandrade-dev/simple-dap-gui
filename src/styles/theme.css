@@ -16,9 +16,13 @@
   --color-text-muted: #6b7280;
   --color-border: #374151;
   --color-accent: #2563eb;
+  --color-accent-text: #ffffff;
   --color-success: #16a34a;
+  --color-success-text: #ffffff;
   --color-danger: #dc2626;
+  --color-danger-text: #ffffff;
   --color-warning: #ca8a04;
+  --color-warning-text: #ffffff;
 }
 
 /* === Base === */
@@ -94,7 +98,7 @@ input:focus-visible {
 
 .panel-item-active {
   background-color: var(--color-accent);
-  color: var(--color-text);
+  color: var(--color-accent-text);
 }
 
 /* === Monaco Editor custom decorations === */

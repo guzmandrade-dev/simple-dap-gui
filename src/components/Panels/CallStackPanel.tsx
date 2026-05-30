@@ -30,7 +30,7 @@ export function CallStackPanel() {
             onClick={() => selectFrame(frame.id)}
             className={`cursor-pointer p-2 text-sm ${
               frame.id === currentFrameId
-                ? 'bg-accent text-text'
+                ? 'bg-accent text-accent-text'
                 : 'text-text'
             }`}
           >

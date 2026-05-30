@@ -84,7 +84,7 @@ export function Toolbar() {
           <button 
             onClick={handleStart}
             disabled={!selectedConfig}
-            className="flex items-center gap-2 px-3 py-1.5 bg-success disabled:bg-elevated disabled:cursor-not-allowed text-sm font-medium"
+            className="flex items-center gap-2 px-3 py-1.5 bg-success text-success-text disabled:bg-elevated disabled:text-text disabled:cursor-not-allowed text-sm font-medium"
           >
             <span>▶</span>
             <span>Debug</span>
@@ -93,7 +93,7 @@ export function Toolbar() {
           <>
             <button 
               onClick={stopSession}
-              className="flex items-center gap-2 px-3 py-1.5 bg-danger text-sm font-medium"
+              className="flex items-center gap-2 px-3 py-1.5 bg-danger text-danger-text text-sm font-medium"
             >
               <span>⏹</span>
               <span>Stop</span>
@@ -103,7 +103,7 @@ export function Toolbar() {
               <>
                 <button 
                   onClick={continueExecution} 
-                  className="flex items-center gap-2 px-3 py-1.5 bg-success text-sm font-medium"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-success text-success-text text-sm font-medium"
                 >
                   <span>▶</span>
                   <span>Continue</span>
@@ -133,7 +133,7 @@ export function Toolbar() {
             ) : (
               <button 
                 onClick={pause} 
-                className="flex items-center gap-2 px-3 py-1.5 bg-warning text-sm font-medium"
+                className="flex items-center gap-2 px-3 py-1.5 bg-warning text-warning-text text-sm font-medium"
               >
                 <span>⏸</span>
                 <span>Pause</span>
@@ -160,7 +160,7 @@ export function Toolbar() {
         {configs.length === 0 && (
           <button
             onClick={createLaunchJson}
-            className="px-3 py-1.5 bg-accent text-sm font-medium whitespace-nowrap"
+            className="px-3 py-1.5 bg-accent text-accent-text text-sm font-medium whitespace-nowrap"
           >
             + Create launch.json
           </button>

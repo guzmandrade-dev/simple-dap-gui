@@ -34,17 +34,16 @@ export function SettingsPanel() {
   };
 
   const openInEditor = async (filePath: string, line?: number) => {
-    const { exec } = await import('child_process');
     const args = settings.editorArgs
       .replace('{file}', filePath)
       .replace('{line}', line?.toString() || '1');
-    
-    exec(`${settings.editorCommand} ${args}`, (err) => {
-      if (err) {
-        console.error('Failed to open editor:', err);
-        alert(`Failed to open editor: ${err.message}`);
-      }
-    });
+
+    try {
+      await window.electronAPI?.execCommand(`${settings.editorCommand} ${args}`);
+    } catch (err) {
+      console.error('Failed to open editor:', err);
+      alert(`Failed to open editor: ${err}`);
+    }
   };
 
   return (
@@ -116,7 +115,7 @@ export function SettingsPanel() {
 
           <button
             onClick={saveSettings}
-            className="w-full bg-accent text-text text-sm py-2"
+            className="w-full bg-accent text-accent-text text-sm py-2"
           >
             {saved ? '✓ Saved!' : 'Save Settings'}
           </button>
@@ -137,24 +136,6 @@ export function SettingsPanel() {
             className="w-full bg-elevated text-text text-sm py-2 px-3 text-left"
           >
             📁 Open Workspace in Editor
-          </button>
-
-          <button
-            onClick={async () => {
-              const root = await window.electronAPI?.getWorkspaceRoot();
-              if (root) {
-                const configPath = await window.electronAPI?.pathJoin(root, '.vscode', 'launch.json');
-                const exists = await window.electronAPI?.fileExists(configPath);
-                if (exists) {
-                  openInEditor(configPath);
-                } else {
-                  alert('launch.json does not exist. Create it first!');
-                }
-              }
-            }}
-            className="w-full bg-elevated text-text text-sm py-2 px-3 text-left"
-          >
-            ⚙️ Edit launch.json
           </button>
         </div>
       </div>

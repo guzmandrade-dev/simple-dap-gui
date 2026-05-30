@@ -121,7 +121,7 @@ export function AdapterManagerPanel() {
                 {adapter.installed ? (
                   <button
                     onClick={() => handleUninstall(adapter.id)}
-                    className="px-2 py-1 bg-danger text-text text-xs"
+                    className="px-2 py-1 bg-danger text-danger-text text-xs"
                     disabled={installing === adapter.id}
                   >
                     {installing === adapter.id ? '...' : 'Uninstall'}
@@ -129,7 +129,7 @@ export function AdapterManagerPanel() {
                 ) : (
                   <button
                     onClick={() => handleInstall(adapter.id)}
-                    className="px-2 py-1 bg-accent text-text text-xs"
+                    className="px-2 py-1 bg-accent text-accent-text text-xs"
                     disabled={installing === adapter.id}
                   >
                     {installing === adapter.id ? 'Installing...' : 'Install'}

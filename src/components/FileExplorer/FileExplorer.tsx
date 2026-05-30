@@ -12,6 +12,23 @@ interface FileExplorerProps {
   onFileSelect: (path: string) => void;
 }
 
+// Recursively find and update a node in the tree by its path
+function updateNodeInTree(
+  nodes: FileNode[],
+  targetPath: string,
+  updater: (node: FileNode) => FileNode
+): FileNode[] {
+  return nodes.map(node => {
+    if (node.path === targetPath) {
+      return updater(node);
+    }
+    if (node.children) {
+      return { ...node, children: updateNodeInTree(node.children, targetPath, updater) };
+    }
+    return node;
+  });
+}
+
 export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
   const [rootPath, setRootPath] = useState<string>('');
   const [files, setFiles] = useState<FileNode[]>([]);
@@ -36,16 +53,11 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
     return () => unsubscribe?.();
   }, []);
 
-  useEffect(() => {
-    if (rootPath) {
-      loadDirectory(rootPath);
-    }
-  }, [rootPath]);
-
-  const loadDirectory = useCallback(async (dirPath: string) => {
+  const loadRootDirectory = useCallback(async () => {
+    if (!rootPath) return;
     setIsLoading(true);
     try {
-      const result = await window.electronAPI?.readDirectory?.(dirPath);
+      const result = await window.electronAPI?.readDirectory?.(rootPath);
       if (result) {
         setFiles(result);
       }
@@ -54,21 +66,49 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [rootPath]);
 
-  const toggleDirectory = (path: string) => {
-    const newExpanded = new Set(expandedDirs);
-    if (newExpanded.has(path)) {
-      newExpanded.delete(path);
+  useEffect(() => {
+    loadRootDirectory();
+  }, [loadRootDirectory]);
+
+  const handleDirectoryToggle = useCallback(async (node: FileNode) => {
+    const isExpanded = expandedDirs.has(node.path);
+
+    if (isExpanded) {
+      setExpandedDirs(prev => {
+        const next = new Set(prev);
+        next.delete(node.path);
+        return next;
+      });
     } else {
-      newExpanded.add(path);
+      // Load children on first expand
+      if (node.isDirectory && node.children === undefined) {
+        try {
+          const result = await window.electronAPI?.readDirectory?.(node.path);
+          if (result) {
+            const children = result.map(child => ({
+              ...child,
+              children: child.isDirectory ? undefined : undefined
+            }));
+            setFiles(prev => updateNodeInTree(prev, node.path, n => ({ ...n, children })));
+          }
+        } catch (err) {
+          console.error('Failed to load subdirectory:', err);
+        }
+      }
+
+      setExpandedDirs(prev => {
+        const next = new Set(prev);
+        next.add(node.path);
+        return next;
+      });
     }
-    setExpandedDirs(newExpanded);
-  };
+  }, [expandedDirs]);
 
   const handleFileClick = (node: FileNode) => {
     if (node.isDirectory) {
-      toggleDirectory(node.path);
+      handleDirectoryToggle(node);
     } else {
       onFileSelect(node.path);
     }
@@ -83,7 +123,7 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
         <div
           onClick={() => handleFileClick(node)}
           className={`
-            flex items-center gap-1 py-1 px-2 cursor-pointer text-sm
+            flex items-center gap-1 py-1 px-2 cursor-pointer text-sm select-none
             ${node.isDirectory ? 'text-text' : 'text-secondary'}
           `}
           style={{ paddingLeft: `${paddingLeft}px` }}
@@ -94,15 +134,15 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
             </span>
           )}
           {!node.isDirectory && <span className="w-4" />}
-          
+
           <span className="mr-1">
             {node.isDirectory ? (isExpanded ? '📂' : '📁') : getFileIcon(node.name)}
           </span>
-          
+
           <span className="truncate">{node.name}</span>
         </div>
-        
-        {node.isDirectory && isExpanded && node.children && (
+
+        {node.isDirectory && isExpanded && node.children && node.children.length > 0 && (
           <div>
             {node.children.map(child => renderNode(child, depth + 1))}
           </div>
@@ -170,8 +210,8 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
           {rootPath.split('/').pop() || rootPath}
         </h3>
       </div>
-      
-      <div className="flex-1 overflow-auto">
+
+      <div className="flex-1 overflow-auto min-w-0">
         {isLoading ? (
           <div className="p-4 text-muted text-sm">Loading...</div>
         ) : files.length === 0 ? (
