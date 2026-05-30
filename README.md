@@ -9,7 +9,10 @@ A standalone DAP (Debug Adapter Protocol) client GUI application built with Elec
 - **Path Mapping**: Full support for remote debugging with path mappings
 - **Call Stack View**: Navigate through the call stack during debugging
 - **Variables Panel**: Inspect variables at different scopes
-- **Breakpoints Management**: Set, remove, and toggle breakpoints
+- **Dark/Light Theme**: Toggle between dark and light editor themes via settings
+- **Debug Adapter Management**: Built-in manager to install/uninstall DAP adapters
+- **Lazy File Loading**: File tree loads directories on-demand with recursive expansion
+- **Workspace Integration**: Open workspace directly in your preferred external editor
 
 ## Project Structure
 
@@ -23,13 +26,15 @@ dap-gui/
 │   │   ├── client.ts     # DAP client with protocol parser
 │   │   ├── session.ts    # Debug session management
 │   │   └── types.ts      # TypeScript type definitions
-│   ├── components/       # React components
-│   │   ├── Editor/       # Monaco Editor wrapper
-│   │   ├── Panels/       # Side panels (stack, variables, breakpoints)
-│   │   ├── Toolbar/      # Debug controls
-│   │   └── StatusBar/    # Status bar
-│   ├── stores/           # Zustand state stores
-│   └── utils/            # Helper utilities
+   │   ├── components/       # React components
+   │   │   ├── Editor/       # Monaco Editor wrapper
+   │   │   ├── FileExplorer/ # Workspace file tree with lazy loading
+   │   │   ├── Panels/       # Side panels (stack, variables, breakpoints, settings, adapters)
+   │   │   ├── Toolbar/      # Debug controls
+   │   │   └── StatusBar/    # Status bar
+   │   ├── styles/           # Theme CSS (dark/light) with CSS custom properties
+   │   ├── stores/           # Zustand state stores
+   │   └── utils/            # Helper utilities
 └── ...
 ```
 
@@ -82,6 +87,29 @@ npm run dev
 4. **Click Debug** to start debugging
 
 5. **Set breakpoints** by clicking in the gutter area
+6. **Toggle Theme** between dark and light via the Settings panel
+
+## External Editor Integration
+
+Configure your preferred editor in the **Settings** panel:
+- **VS Code** (default): `code`
+- **Cursor**, **Zed**, **Sublime Text**, **Vim**, **Neovim**
+- **Custom command** with argument templates (`{file}`, `{line}`)
+
+Use **"Open Workspace in Editor"** to open the current workspace root directly.
+
+## Theme & Appearance
+
+The app supports dark and light themes via CSS custom properties mapped to Tailwind's semantic color tokens (`bg-panel`, `text-accent`, `border-danger`, etc.). Themes are persisted to `localStorage` and switch instantly across the UI and Monaco Editor.
+
+## Debug Adapter Management
+
+Install or uninstall DAP adapters from the **Adapters** panel. The manager tracks installed adapters, their paths, and supported languages. Currently supports:
+
+- **PHP**: `vscode-php-debug`
+- **Python**: `debugpy`
+- **Node.js**: Built-in DAP support
+- **C/C++**: `vscode-cpptools`
 
 ## Development
 
