@@ -17,7 +17,12 @@ export interface ElectronAPI {
   openFolder: () => Promise<void>;
   onFolderOpened: (callback: (path: string) => void) => () => void;
   onWorkspaceChanged: (callback: (path: string) => void) => () => void;
-  
+
+  // Settings
+  getAppSettings: () => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string }>;
+  setAppSettings: (settings: Partial<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string }>) => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string }>;
+  onSettingsChanged: (callback: (settings: { theme: 'dark' | 'light'; editorCommand: string; editorArgs: string }) => void) => () => void;
+
   // Window controls
   windowMinimize: () => Promise<void>;
   windowMaximize: () => Promise<void>;
@@ -48,6 +53,7 @@ export interface ElectronAPI {
   installAdapter: (adapterId: string) => Promise<AdapterInfo>;
   uninstallAdapter: (adapterId: string) => Promise<void>;
   getAdapterPath: (adapterId: string) => Promise<string | null>;
+  installCustomAdapter: () => Promise<AdapterInfo>;
 }
 
 export interface AdapterInfo {
@@ -61,6 +67,7 @@ export interface AdapterInfo {
   installPath?: string;
   entryPoint?: string;
   supportedLanguages: string[];
+  isCustom?: boolean;
 }
 
 declare global {
@@ -94,7 +101,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('workspace-changed', handler);
     return () => ipcRenderer.removeListener('workspace-changed', handler);
   },
-  
+
+  // Settings
+  getAppSettings: () => ipcRenderer.invoke('get-app-settings'),
+  setAppSettings: (settings: Partial<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string }>) =>
+    ipcRenderer.invoke('set-app-settings', settings),
+  onSettingsChanged: (callback: (settings: { theme: 'dark' | 'light'; editorCommand: string; editorArgs: string }) => void) => {
+    const handler = (_event: unknown, settings: unknown) => callback(settings as { theme: 'dark' | 'light'; editorCommand: string; editorArgs: string });
+    ipcRenderer.on('settings-changed', handler);
+    return () => ipcRenderer.removeListener('settings-changed', handler);
+  },
+
   // Window controls
   windowMinimize: () => ipcRenderer.invoke('window-minimize'),
   windowMaximize: () => ipcRenderer.invoke('window-maximize'),
@@ -150,4 +167,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installAdapter: (adapterId: string) => ipcRenderer.invoke('install-adapter', adapterId),
   uninstallAdapter: (adapterId: string) => ipcRenderer.invoke('uninstall-adapter', adapterId),
   getAdapterPath: (adapterId: string) => ipcRenderer.invoke('get-adapter-path', adapterId),
+  installCustomAdapter: () => ipcRenderer.invoke('install-custom-adapter'),
 });

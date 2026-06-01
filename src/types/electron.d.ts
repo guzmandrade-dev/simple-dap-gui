@@ -1,4 +1,4 @@
-export interface AdapterInfo {
+  export interface AdapterInfo {
   id: string;
   name: string;
   description: string;
@@ -9,6 +9,7 @@ export interface AdapterInfo {
   installPath?: string;
   entryPoint?: string;
   supportedLanguages: string[];
+  isCustom?: boolean;
 }
 
 export interface ElectronAPI {
@@ -28,7 +29,12 @@ export interface ElectronAPI {
   openFolder: () => Promise<void>;
   onFolderOpened: (callback: (path: string) => void) => () => void;
   onWorkspaceChanged: (callback: (path: string) => void) => () => void;
-  
+
+  // Settings
+  getAppSettings: () => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string }>;
+  setAppSettings: (settings: Partial<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string }>) => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string }>;
+  onSettingsChanged: (callback: (settings: { theme: 'dark' | 'light'; editorCommand: string; editorArgs: string }) => void) => () => void;
+
   // Window controls
   windowMinimize: () => Promise<void>;
   windowMaximize: () => Promise<void>;
@@ -59,6 +65,7 @@ export interface ElectronAPI {
   installAdapter: (adapterId: string) => Promise<AdapterInfo>;
   uninstallAdapter: (adapterId: string) => Promise<void>;
   getAdapterPath: (adapterId: string) => Promise<string | null>;
+  installCustomAdapter: () => Promise<AdapterInfo>;
 }
 
 declare global {

@@ -89,14 +89,20 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
 
   setTheme: (theme: 'dark' | 'light') => {
     set({ theme });
-    localStorage.setItem('dapdesk-theme', theme);
     document.documentElement.setAttribute('data-theme', theme);
+    window.electronAPI?.setAppSettings({ theme });
   },
 
-  loadTheme: () => {
-    const saved = localStorage.getItem('dapdesk-theme') as 'dark' | 'light' | null;
-    const theme = saved || 'dark';
-    set({ theme });
-    document.documentElement.setAttribute('data-theme', theme);
+  loadTheme: async () => {
+    try {
+      const settings = await window.electronAPI?.getAppSettings();
+      const theme = settings?.theme || 'dark';
+      set({ theme });
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (err) {
+      console.error('Failed to load theme from settings:', err);
+      set({ theme: 'dark' });
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
   },
 }));

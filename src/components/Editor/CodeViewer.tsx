@@ -12,7 +12,7 @@ interface Settings {
 
 const DEFAULT_SETTINGS: Settings = {
   editorCommand: 'code',
-  editorArgs: '{file}:{line}',
+  editorArgs: '{file}',
 };
 
 interface CodeViewerProps {
@@ -25,14 +25,14 @@ export function CodeViewer({ className }: CodeViewerProps) {
   const decorationsRef = useRef<string[]>([]);
   const breakpointsRef = useRef<Map<string, Set<number>>>(new Map());
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  
+
   const { currentFile, fileContents } = useEditorStore();
-  const { 
-    currentLine, 
-    isPaused, 
-    breakpoints, 
-    setBreakpoint, 
-    removeBreakpoint 
+  const {
+    currentLine,
+    isPaused,
+    breakpoints,
+    setBreakpoint,
+    removeBreakpoint
   } = useDebugStore();
   const { theme } = useConfigStore();
 
@@ -40,24 +40,38 @@ export function CodeViewer({ className }: CodeViewerProps) {
   breakpointsRef.current = breakpoints;
 
   useEffect(() => {
-    const saved = localStorage.getItem('dapdesk-settings');
-    if (saved) {
+    const load = async () => {
       try {
-        setSettings(JSON.parse(saved));
+        const appSettings = await window.electronAPI?.getAppSettings();
+        if (appSettings) {
+          setSettings({
+            editorCommand: appSettings.editorCommand,
+            editorArgs: appSettings.editorArgs,
+          });
+        }
       } catch (e) {
         console.error('Failed to load settings:', e);
       }
-    }
+    };
+    load();
+
+    const unsubscribe = window.electronAPI?.onSettingsChanged((appSettings) => {
+      setSettings({
+        editorCommand: appSettings.editorCommand,
+        editorArgs: appSettings.editorArgs,
+      });
+    });
+    return () => unsubscribe?.();
   }, []);
 
   const openInEditor = async () => {
     if (!currentFile) return;
-    
+
     const line = currentLine || 1;
     const args = settings.editorArgs
       .replace('{file}', currentFile)
       .replace('{line}', line.toString());
-    
+
     try {
       await window.electronAPI?.execCommand?.(`${settings.editorCommand} ${args}`);
     } catch (err) {
@@ -72,12 +86,12 @@ export function CodeViewer({ className }: CodeViewerProps) {
 
     editor.onMouseDown((e: any) => {
       const targetType = e.target.type;
-      
+
       // Check if click is in gutter area
-      const isGutter = 
+      const isGutter =
         targetType === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
         targetType === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS;
-      
+
       // Check if click is directly on a breakpoint glyph decoration
       // (Monaco may report a different target type when clicking on custom decorations)
       let isBreakpointElement = false;
@@ -90,14 +104,14 @@ export function CodeViewer({ className }: CodeViewerProps) {
         }
         el = el.parentElement;
       }
-      
+
       if (isGutter || isBreakpointElement) {
         const line = e.target.position?.lineNumber;
         if (!line || !currentFile) return;
-        
+
         const fileBPs = breakpointsRef.current.get(currentFile) || new Set();
         const hasBP = fileBPs.has(line);
-        
+
         if (hasBP) {
           removeBreakpoint(currentFile, line);
         } else {
@@ -109,7 +123,7 @@ export function CodeViewer({ className }: CodeViewerProps) {
 
   useEffect(() => {
     if (!currentFile) return;
-    
+
     const loadFile = async () => {
       try {
         const content = await fetchFileContent(currentFile);
@@ -120,7 +134,7 @@ export function CodeViewer({ className }: CodeViewerProps) {
         console.error('Failed to load file:', err);
       }
     };
-    
+
     if (!fileContents.has(currentFile)) {
       loadFile();
     }
@@ -128,11 +142,11 @@ export function CodeViewer({ className }: CodeViewerProps) {
 
   useEffect(() => {
     if (!editorRef.current || !monacoRef.current || !currentFile) return;
-    
+
     const monaco = monacoRef.current;
     const editor = editorRef.current;
     const model = editor.getModel();
-    
+
     if (!model) return;
 
     if (decorationsRef.current.length > 0) {
@@ -140,7 +154,7 @@ export function CodeViewer({ className }: CodeViewerProps) {
     }
 
     const newDecorations: any[] = [];
-    
+
     const fileBPs = breakpoints.get(currentFile) || new Set();
     fileBPs.forEach(line => {
       newDecorations.push({
@@ -152,7 +166,7 @@ export function CodeViewer({ className }: CodeViewerProps) {
         }
       });
     });
-    
+
     if (isPaused && currentLine) {
       newDecorations.push({
         range: new monaco.Range(currentLine, 1, currentLine, 1),
@@ -162,7 +176,7 @@ export function CodeViewer({ className }: CodeViewerProps) {
           glyphMarginClassName: 'breakpoint-glyph current-line-glyph',
         }
       });
-      
+
       editor.revealLineInCenter(currentLine);
     }
 
@@ -199,7 +213,7 @@ export function CodeViewer({ className }: CodeViewerProps) {
               </span>
             )}
           </div>
-          
+
           <button
             onClick={openInEditor}
             className="flex items-center gap-1.5 px-2 py-1 text-xs bg-elevated text-secondary"
@@ -209,7 +223,7 @@ export function CodeViewer({ className }: CodeViewerProps) {
             <span>Open in Editor</span>
           </button>
         </div>
-        
+
         <div className="flex-1">
           <Editor
             height="100%"

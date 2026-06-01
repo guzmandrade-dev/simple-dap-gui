@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { ADAPTER_CATALOG, AdapterInfo } from '../src/utils/adapterManager';
+import { watch as fsWatch, FSWatcher } from 'fs';
+import { ADAPTER_CATALOG, AdapterInfo, InstalledAdapterManifest } from '../src/utils/adapterManager';
 import { DebugSession } from '../src/dap/session';
 import { LaunchConfiguration } from '../src/dap/types';
 import { DebugProtocol } from '@vscode/debugprotocol';
@@ -12,6 +13,85 @@ let currentProjectPath: string | null = null;
 
 // Adapters storage directory
 const getAdaptersDir = () => path.join(app.getPath('userData'), 'adapters');
+
+const MANIFEST_FILENAME = 'adapters-manifest.json';
+const getManifestPath = () => path.join(getAdaptersDir(), MANIFEST_FILENAME);
+
+async function loadInstalledManifest(): Promise<InstalledAdapterManifest[]> {
+  try {
+    const content = await fs.readFile(getManifestPath(), 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return [];
+  }
+}
+
+async function saveInstalledManifest(manifest: InstalledAdapterManifest[]): Promise<void> {
+  const adaptersDir = getAdaptersDir();
+  await fs.mkdir(adaptersDir, { recursive: true });
+  await fs.writeFile(getManifestPath(), JSON.stringify(manifest, null, 2), 'utf-8');
+}
+
+// App Settings
+export interface AppSettings {
+  theme: 'dark' | 'light';
+  editorCommand: string;
+  editorArgs: string;
+}
+
+const DEFAULT_SETTINGS: AppSettings = {
+  theme: 'dark',
+  editorCommand: 'code',
+  editorArgs: '{file}',
+};
+
+const SETTINGS_FILENAME = 'settings.json';
+const getSettingsPath = () => path.join(app.getPath('userData'), SETTINGS_FILENAME);
+
+async function loadSettings(): Promise<AppSettings> {
+  try {
+    const content = await fs.readFile(getSettingsPath(), 'utf-8');
+    const parsed = JSON.parse(content) as Partial<AppSettings>;
+    return { ...DEFAULT_SETTINGS, ...parsed };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+async function saveSettings(settings: AppSettings): Promise<void> {
+  const settingsPath = getSettingsPath();
+  await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+}
+
+let currentSettings: AppSettings = { ...DEFAULT_SETTINGS };
+let settingsWatcher: FSWatcher | null = null;
+
+async function initSettings(): Promise<void> {
+  currentSettings = await loadSettings();
+
+  const settingsPath = getSettingsPath();
+  try {
+    await fs.access(settingsPath);
+  } catch {
+    await saveSettings(currentSettings);
+  }
+
+  settingsWatcher = fsWatch(settingsPath, async (eventType: string) => {
+    if (eventType === 'change') {
+      try {
+        const updated = await loadSettings();
+        currentSettings = updated;
+        mainWindow?.webContents.send('settings-changed', updated);
+      } catch (err) {
+        console.error('Failed to reload settings after file change:', err);
+      }
+    }
+  });
+}
+
+app.on('quit', () => {
+  settingsWatcher?.close();
+});
 
 // Debug Session Manager - runs in main process only
 class DebugSessionManager {
@@ -76,20 +156,36 @@ class DebugSessionManager {
   }
 
   private async getAdapterPath(type: string): Promise<string | null> {
-    const adapter = ADAPTER_CATALOG.find(a => 
+    const adaptersDir = getAdaptersDir();
+
+    // First, check catalog adapters
+    const catalogAdapter = ADAPTER_CATALOG.find(a =>
       a.id === `felixfbecker.${type}-debug` || a.supportedLanguages.includes(type)
     );
-    if (!adapter?.entryPoint) return null;
-    
-    const adaptersDir = getAdaptersDir();
-    const adapterPath = path.join(adaptersDir, adapter.id, adapter.entryPoint);
-    
-    try {
-      await fs.access(adapterPath);
-      return adapterPath;
-    } catch {
-      return null;
+    if (catalogAdapter?.entryPoint) {
+      const adapterPath = path.join(adaptersDir, catalogAdapter.id, catalogAdapter.entryPoint);
+      try {
+        await fs.access(adapterPath);
+        return adapterPath;
+      } catch {
+        // not installed, continue to check custom
+      }
     }
+
+    // Then, check custom installed adapters that support this language
+    const manifest = await loadInstalledManifest();
+    const customAdapter = manifest.find(a => a.supportedLanguages.includes(type));
+    if (customAdapter) {
+      const adapterPath = path.join(customAdapter.installPath, customAdapter.entryPoint);
+      try {
+        await fs.access(adapterPath);
+        return adapterPath;
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
   }
 
   private setupEventHandlers(): void {
@@ -184,7 +280,8 @@ async function openFolder() {
 }
 
 // App event handlers
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await initSettings();
   createWindow();
 
   app.on('activate', () => {
@@ -235,14 +332,84 @@ async function downloadFile(
 async function extractVsix(vsixPath: string, destPath: string): Promise<void> {
   await fs.mkdir(destPath, { recursive: true });
 
-  // Use system unzip command
-  const { exec } = await import('child_process');
-  return new Promise((resolve, reject) => {
-    exec(`unzip -o "${vsixPath}" -d "${destPath}"`, (error) => {
-      if (error) reject(error);
-      else resolve();
-    });
-  });
+  const AdmZip = (await import('adm-zip')).default;
+  const zip = new AdmZip(vsixPath);
+  zip.extractAllTo(destPath, true);
+}
+
+// Parse .vsix package.json metadata without extracting to disk
+async function parseVsixPackageJson(vsixPath: string): Promise<Record<string, unknown> | null> {
+  try {
+    const { default: AdmZip } = await import('adm-zip');
+    const zip = new AdmZip(vsixPath);
+    const entry = zip.getEntry('extension/package.json');
+    if (!entry) return null;
+    const content = entry.getData().toString('utf-8');
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+// Infer adapter metadata from .vsix package.json
+function inferAdapterFromPackageJson(pkg: Record<string, unknown>): {
+  id: string;
+  name: string;
+  description: string;
+  publisher: string;
+  version: string;
+  entryPoint: string;
+  supportedLanguages: string[];
+} | null {
+  const id = `${pkg.publisher}.${pkg.name}`;
+  if (!id || !pkg.name) return null;
+
+  // VS Code debug adapters declare their entry point in contributes.debuggers
+  const contributes = pkg.contributes as Record<string, unknown> | undefined;
+  const debuggers = contributes?.debuggers as Array<Record<string, unknown>> | undefined;
+  if (!debuggers || debuggers.length === 0) return null;
+
+  const dbg = debuggers[0];
+  const program = dbg.program as string | undefined;
+
+  // Determine entry point. Some adapters ship a Node program, others a runtime + program combo
+  let entryPoint = '';
+  if (program) {
+    entryPoint = `extension/${program}`;
+  } else if (pkg.main) {
+    // fallback to extension main
+    entryPoint = `extension/${pkg.main}`;
+  } else {
+    return null;
+  }
+
+  const languages: string[] = [];
+  if (Array.isArray(dbg.languages)) {
+    for (const lang of dbg.languages) {
+      if (typeof lang === 'string') languages.push(lang);
+    }
+  }
+  // fallback: if no languages declared, try to infer from name
+  if (languages.length === 0) {
+    const nameLower = String(pkg.name).toLowerCase();
+    if (nameLower.includes('php')) languages.push('php');
+    else if (nameLower.includes('python')) languages.push('python');
+    else if (nameLower.includes('node') || nameLower.includes('js')) languages.push('javascript');
+    else if (nameLower.includes('go')) languages.push('go');
+    else if (nameLower.includes('rust')) languages.push('rust');
+    else if (nameLower.includes('cpp') || nameLower.includes('c++') || nameLower.includes('lldb')) languages.push('cpp', 'c');
+    else languages.push('unknown');
+  }
+
+  return {
+    id,
+    name: String(pkg.displayName || pkg.name),
+    description: String(pkg.description || ''),
+    publisher: String(pkg.publisher || 'unknown'),
+    version: String(pkg.version || '0.0.0'),
+    entryPoint,
+    supportedLanguages: languages,
+  };
 }
 
 // IPC handlers
@@ -324,6 +491,17 @@ ipcMain.handle('set-workspace-root', (_event, root: string) => {
   // Notify renderer that workspace changed
   mainWindow?.webContents.send('workspace-changed', root);
   return root;
+});
+
+ipcMain.handle('get-app-settings', async () => {
+  return currentSettings;
+});
+
+ipcMain.handle('set-app-settings', async (_event, settings: Partial<AppSettings>) => {
+  currentSettings = { ...currentSettings, ...settings };
+  await saveSettings(currentSettings);
+  mainWindow?.webContents.send('settings-changed', currentSettings);
+  return currentSettings;
 });
 
 ipcMain.handle('path-resolve', (_event, ...paths: string[]) => {
@@ -454,6 +632,38 @@ ipcMain.handle('get-adapter-catalog', async (): Promise<AdapterInfo[]> => {
     }
   }
 
+  // Merge with custom adapters from manifest
+  const manifest = await loadInstalledManifest();
+  for (const custom of manifest) {
+    const entryPointPath = path.join(custom.installPath, custom.entryPoint);
+    let installed = false;
+    try {
+      await fs.access(entryPointPath);
+      installed = true;
+    } catch { /* not found */ }
+
+    const idx = adapters.findIndex(a => a.id === custom.id);
+    const customInfo: AdapterInfo = {
+      id: custom.id,
+      name: custom.name,
+      description: custom.description,
+      publisher: custom.publisher,
+      version: custom.version,
+      downloadUrl: '',
+      installed,
+      installPath: custom.installPath,
+      entryPoint: custom.entryPoint,
+      supportedLanguages: custom.supportedLanguages,
+      isCustom: true,
+    };
+
+    if (idx >= 0) {
+      adapters[idx] = customInfo;
+    } else {
+      adapters.push(customInfo);
+    }
+  }
+
   return adapters;
 });
 
@@ -499,19 +709,109 @@ ipcMain.handle('uninstall-adapter', async (_event, adapterId: string): Promise<v
   const adaptersDir = getAdaptersDir();
   const installPath = path.join(adaptersDir, adapterId);
   await fs.rm(installPath, { recursive: true, force: true });
+
+  // Remove from manifest if custom
+  const manifest = await loadInstalledManifest();
+  const idx = manifest.findIndex(a => a.id === adapterId);
+  if (idx >= 0) {
+    manifest.splice(idx, 1);
+    await saveInstalledManifest(manifest);
+  }
 });
 
 ipcMain.handle('get-adapter-path', async (_event, adapterId: string): Promise<string | null> => {
   const adapter = ADAPTER_CATALOG.find(a => a.id === adapterId);
-  if (!adapter?.entryPoint) return null;
+  if (adapter?.entryPoint) {
+    const adaptersDir = getAdaptersDir();
+    const adapterPath = path.join(adaptersDir, adapterId, adapter.entryPoint);
+    try {
+      await fs.access(adapterPath);
+      return adapterPath;
+    } catch {
+      // fall through to custom
+    }
+  }
+
+  const manifest = await loadInstalledManifest();
+  const custom = manifest.find(a => a.id === adapterId);
+  if (custom) {
+    const adapterPath = path.join(custom.installPath, custom.entryPoint);
+    try {
+      await fs.access(adapterPath);
+      return adapterPath;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+});
+
+// Install a custom adapter from a user-picked .vsix file — auto-parses metadata
+ipcMain.handle('install-custom-adapter', async (): Promise<AdapterInfo> => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: [{ name: 'VS Code Extension', extensions: ['vsix'] }],
+  });
+  if (result.canceled || result.filePaths.length === 0) {
+    throw new Error('No file selected');
+  }
+  const vsixPath = result.filePaths[0];
+
+  const pkg = await parseVsixPackageJson(vsixPath);
+  if (!pkg) {
+    throw new Error('Could not parse extension/package.json from .vsix');
+  }
+
+  const meta = inferAdapterFromPackageJson(pkg);
+  if (!meta) {
+    throw new Error('Could not infer adapter metadata from .vsix. Is this a debug adapter extension?');
+  }
 
   const adaptersDir = getAdaptersDir();
-  const adapterPath = path.join(adaptersDir, adapterId, adapter.entryPoint);
+  const installPath = path.join(adaptersDir, meta.id);
 
   try {
-    await fs.access(adapterPath);
-    return adapterPath;
-  } catch {
-    return null;
+    await fs.mkdir(adaptersDir, { recursive: true });
+    await extractVsix(vsixPath, installPath);
+
+    // Verify entry point exists
+    const entryFull = path.join(installPath, meta.entryPoint);
+    try {
+      await fs.access(entryFull);
+    } catch {
+      throw new Error(
+        `Entry point not found after extraction: "${meta.entryPoint}". ` +
+        `The adapter may require external binaries or a different entry point.`
+      );
+    }
+
+    // Add to manifest
+    const manifest = await loadInstalledManifest();
+    const idx = manifest.findIndex(a => a.id === meta.id);
+    const entry: InstalledAdapterManifest = {
+      ...meta,
+      installPath,
+      installedAt: new Date().toISOString(),
+    };
+    if (idx >= 0) {
+      manifest[idx] = entry;
+    } else {
+      manifest.push(entry);
+    }
+    await saveInstalledManifest(manifest);
+
+    return {
+      ...meta,
+      downloadUrl: '',
+      installed: true,
+      installPath,
+      isCustom: true,
+    };
+  } catch (error) {
+    try {
+      await fs.rm(installPath, { recursive: true, force: true });
+    } catch {}
+    throw error;
   }
 });

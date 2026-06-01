@@ -8,7 +8,7 @@ interface Settings {
 
 const DEFAULT_SETTINGS: Settings = {
   editorCommand: 'code',
-  editorArgs: '{file}:{line}',
+  editorArgs: '{file}',
 };
 
 export function SettingsPanel() {
@@ -17,20 +17,41 @@ export function SettingsPanel() {
   const { theme, setTheme } = useConfigStore();
 
   useEffect(() => {
-    const saved = localStorage.getItem('dapdesk-settings');
-    if (saved) {
+    const load = async () => {
       try {
-        setSettings(JSON.parse(saved));
+        const appSettings = await window.electronAPI?.getAppSettings();
+        if (appSettings) {
+          setSettings({
+            editorCommand: appSettings.editorCommand,
+            editorArgs: appSettings.editorArgs,
+          });
+        }
       } catch (e) {
         console.error('Failed to load settings:', e);
       }
-    }
+    };
+    load();
+
+    const unsubscribe = window.electronAPI?.onSettingsChanged((appSettings) => {
+      setSettings({
+        editorCommand: appSettings.editorCommand,
+        editorArgs: appSettings.editorArgs,
+      });
+    });
+    return () => unsubscribe?.();
   }, []);
 
-  const saveSettings = () => {
-    localStorage.setItem('dapdesk-settings', JSON.stringify(settings));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const saveSettings = async () => {
+    try {
+      await window.electronAPI?.setAppSettings({
+        editorCommand: settings.editorCommand,
+        editorArgs: settings.editorArgs,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      console.error('Failed to save settings:', e);
+    }
   };
 
   const openInEditor = async (filePath: string, line?: number) => {
@@ -50,7 +71,7 @@ export function SettingsPanel() {
     <div className="p-4 space-y-6">
       <div>
         <h3 className="text-sm font-bold text-text mb-4">Appearance</h3>
-        
+
         <div className="space-y-4">
           <div>
             <label className="block text-xs text-secondary mb-1">Theme</label>
@@ -68,7 +89,7 @@ export function SettingsPanel() {
 
       <div className="border-t border-border pt-4">
         <h3 className="text-sm font-bold text-text mb-4">External Editor</h3>
-        
+
         <div className="space-y-4">
           <div>
             <label className="block text-xs text-secondary mb-1">Editor Command</label>
@@ -87,7 +108,7 @@ export function SettingsPanel() {
               <option value="nvim">Neovim</option>
               <option value="custom">Custom...</option>
             </select>
-            
+
             {settings.editorCommand === 'custom' && (
               <input
                 type="text"
@@ -106,7 +127,7 @@ export function SettingsPanel() {
               value={settings.editorArgs}
               onChange={(e) => setSettings({ ...settings, editorArgs: e.target.value })}
               className="w-full bg-elevated border border-border px-2 py-1 text-sm text-text"
-              placeholder="{file}:{line}"
+              placeholder="{file}"
             />
             <p className="text-xs text-muted mt-1">
               Use {'{file}'} for file path and {'{line}'} for line number
@@ -124,7 +145,7 @@ export function SettingsPanel() {
 
       <div className="border-t border-border pt-4">
         <h3 className="text-sm font-bold text-text mb-4">Quick Actions</h3>
-        
+
         <div className="space-y-2">
           <button
             onClick={async () => {
