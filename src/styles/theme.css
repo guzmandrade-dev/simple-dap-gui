@@ -101,7 +101,12 @@ input:focus-visible {
   color: var(--color-accent-text);
 }
 
-/* === Monaco Editor custom decorations === */
+/* === Vertical text for collapsed panels === */
+.writing-mode-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+}
 .breakpoint-glyph {
   background: var(--color-danger);
   width: 10px !important;

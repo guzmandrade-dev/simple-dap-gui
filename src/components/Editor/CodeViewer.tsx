@@ -17,9 +17,10 @@ const DEFAULT_SETTINGS: Settings = {
 
 interface CodeViewerProps {
   className?: string;
+  onCollapse?: () => void;
 }
 
-export function CodeViewer({ className }: CodeViewerProps) {
+export function CodeViewer({ className, onCollapse }: CodeViewerProps) {
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
@@ -204,6 +205,14 @@ export function CodeViewer({ className }: CodeViewerProps) {
       <div className="h-full flex flex-col">
         <div className="h-9 bg-panel border-b border-border flex items-center justify-between px-3 flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">
+            <button
+              onClick={openInEditor}
+              className="flex items-center gap-1.5 px-2 py-1 text-xs bg-elevated text-secondary shrink-0"
+              title={`Open in ${settings.editorCommand}`}
+            >
+              <span>📝</span>
+              <span>Open in Editor</span>
+            </button>
             <span className="text-secondary text-sm truncate" title={currentFile}>
               {fileName}
             </span>
@@ -213,14 +222,14 @@ export function CodeViewer({ className }: CodeViewerProps) {
               </span>
             )}
           </div>
-
           <button
-            onClick={openInEditor}
-            className="flex items-center gap-1.5 px-2 py-1 text-xs bg-elevated text-secondary"
-            title={`Open in ${settings.editorCommand}`}
+            onClick={onCollapse}
+            className="w-7 h-7 flex items-center justify-center rounded bg-elevated text-muted hover:text-text hover:bg-border transition-colors shrink-0"
+            title="Collapse editor"
           >
-            <span>📝</span>
-            <span>Open in Editor</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 4l5 4-5 4" />
+            </svg>
           </button>
         </div>
 

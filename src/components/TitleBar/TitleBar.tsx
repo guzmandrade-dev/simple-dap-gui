@@ -22,7 +22,7 @@ export function TitleBar() {
   };
 
   return (
-    <div className="h-8 bg-panel flex items-center justify-between select-none app-drag-region">
+    <div className="h-12 bg-panel flex items-center justify-between select-none app-drag-region">
       <div className="flex-1 px-4 text-sm text-secondary font-medium truncate">
         DapDesk - DAP Debugger GUI
       </div>
@@ -30,7 +30,7 @@ export function TitleBar() {
       <div className="flex items-center app-no-drag-region">
         <button
           onClick={handleMinimize}
-          className="w-12 h-8 flex items-center justify-center text-secondary"
+          className="w-12 h-12 flex items-center justify-center text-secondary"
           title="Minimize"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
@@ -40,7 +40,7 @@ export function TitleBar() {
         
         <button
           onClick={handleMaximize}
-          className="w-12 h-8 flex items-center justify-center text-secondary"
+          className="w-12 h-12 flex items-center justify-center text-secondary"
           title={isMaximized ? "Restore" : "Maximize"}
         >
           {isMaximized ? (
@@ -56,7 +56,7 @@ export function TitleBar() {
         
         <button
           onClick={handleClose}
-          className="w-12 h-8 flex items-center justify-center text-secondary"
+          className="w-12 h-12 flex items-center justify-center text-secondary"
           title="Close"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
