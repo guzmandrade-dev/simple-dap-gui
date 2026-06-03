@@ -8,11 +8,14 @@ A standalone DAP (Debug Adapter Protocol) client GUI application built with Elec
 - **Monaco Editor**: VS Code's editor with syntax highlighting and breakpoint gutter support
 - **Path Mapping**: Full support for remote debugging with path mappings
 - **Call Stack View**: Navigate through the call stack during debugging
-- **Variables Panel**: Inspect variables at different scopes
+- **Variables Panel**: Inspect variables at different scopes with expandable children
+- **Watch Panel**: Evaluate and monitor custom expressions while debugging
 - **Dark/Light Theme**: Toggle between dark and light editor themes via settings
 - **Debug Adapter Management**: Built-in manager to install/uninstall DAP adapters
 - **Lazy File Loading**: File tree loads directories on-demand with recursive expansion
 - **Workspace Integration**: Open workspace directly in your preferred external editor
+- **Collapsible Layout**: Collapse the editor panel to focus on file explorer and debug tools
+- **Keyboard Shortcuts**: Standard debug shortcuts (F5, F10, F11, Shift+F5, Shift+F11)
 
 ## Project Structure
 
@@ -26,15 +29,15 @@ dap-gui/
 │   │   ├── client.ts     # DAP client with protocol parser
 │   │   ├── session.ts    # Debug session management
 │   │   └── types.ts      # TypeScript type definitions
-   │   ├── components/       # React components
-   │   │   ├── Editor/       # Monaco Editor wrapper
-   │   │   ├── FileExplorer/ # Workspace file tree with lazy loading
-   │   │   ├── Panels/       # Side panels (stack, variables, breakpoints, settings, adapters)
-   │   │   ├── Toolbar/      # Debug controls
-   │   │   └── StatusBar/    # Status bar
-   │   ├── styles/           # Theme CSS (dark/light) with CSS custom properties
-   │   ├── stores/           # Zustand state stores
-   │   └── utils/            # Helper utilities
+│   ├── components/       # React components
+│   │   ├── Editor/       # Monaco Editor wrapper
+│   │   ├── FileExplorer/ # Workspace file tree with lazy loading
+│   │   ├── Panels/       # Side panels (stack, variables, watch, breakpoints, settings, adapters)
+│   │   ├── Toolbar/      # Debug controls
+│   │   └── StatusBar/    # Status bar
+│   ├── styles/           # Theme CSS (dark/light) with CSS custom properties
+│   ├── stores/           # Zustand state stores
+│   └── utils/            # Helper utilities
 └── ...
 ```
 
@@ -84,10 +87,38 @@ npm run dev
 
 3. **Select a configuration** from the dropdown in the toolbar
 
-4. **Click Debug** to start debugging
+4. **Click Debug** (or press **F5**) to start debugging
 
 5. **Set breakpoints** by clicking in the gutter area
+
 6. **Toggle Theme** between dark and light via the Settings panel
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| **F5** | Start Debugging / Continue |
+| **Shift + F5** | Stop Debugging |
+| **F10** | Step Over |
+| **F11** | Step Into |
+| **Shift + F11** | Step Out |
+
+## Panels
+
+### Variables
+Inspect local and global variables at the current stack frame. Expand arrays and objects to view their children.
+
+### Watch
+Add custom expressions (e.g., `$myVariable`, `$_SERVER['REQUEST_URI']`) to monitor their values as you step through code. Watches are re-evaluated automatically on every stop.
+
+### Call Stack
+Navigate between stack frames to inspect variables at different levels of execution.
+
+### Breakpoints
+View and manage all breakpoints set across the workspace.
+
+### Adapters
+Install, uninstall, and manage DAP adapters for different languages.
 
 ## External Editor Integration
 
@@ -97,6 +128,14 @@ Configure your preferred editor in the **Settings** panel:
 - **Custom command** with argument templates (`{file}`, `{line}`)
 
 Use **"Open Workspace in Editor"** to open the current workspace root directly.
+
+## Collapsible Layout
+
+Click the **→** arrow in the editor header to collapse the editor panel. This gives the file explorer and debug panels more room. When collapsed:
+- The file explorer and sidebar share the available space
+- You can still resize the split between them
+- Click any file in the explorer to auto-expand the editor
+- Use the **←** button on the far right to restore the editor
 
 ## Theme & Appearance
 
@@ -139,7 +178,7 @@ This converts server paths to local paths when displaying files and vice versa w
 ## Supported Debug Adapters
 
 - **PHP**: Install `vscode-php-debug` adapter
-- **Python**: Use `debugpy` 
+- **Python**: Use `debugpy`
 - **Node.js**: Built-in DAP support
 - **C/C++**: Use `vscode-cpptools`
 
@@ -148,6 +187,7 @@ This converts server paths to local paths when displaying files and vice versa w
 - **Adapter not found**: Make sure to install the appropriate debug adapter for your language
 - **Breakpoints not hit**: Check path mappings configuration
 - **Connection refused**: Ensure the debug server is running and listening on the correct port
+- **Spawn node ENOENT on Windows**: The app now uses `process.execPath` with `ELECTRON_RUN_AS_NODE` to reliably spawn adapters in packaged builds
 
 ## License
 
