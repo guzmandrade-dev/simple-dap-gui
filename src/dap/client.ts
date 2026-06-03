@@ -12,7 +12,7 @@ export class DAPClient extends EventEmitter {
   async spawn(adapterPath: string, args: string[] = []) {
     const { spawn } = await import('child_process');
     
-    this.adapter = spawn('node', [adapterPath, ...args], {
+    this.adapter = spawn(process.execPath, [adapterPath, ...args], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
