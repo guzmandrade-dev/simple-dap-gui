@@ -14,6 +14,7 @@ export class DAPClient extends EventEmitter {
     
     this.adapter = spawn(process.execPath, [adapterPath, ...args], {
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
     });
 
     this.adapter.stdout?.on('data', this.onData.bind(this));
