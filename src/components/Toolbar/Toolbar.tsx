@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useDebugStore } from '../../stores/debugStore';
 import { useConfigStore } from '../../stores/configStore';
 
@@ -29,10 +30,13 @@ const DEFAULT_LAUNCH_JSON = {
 export function Toolbar() {
   const { isSessionActive, isPaused, startSession, stopSession, continue: continueExecution, stepOver, stepInto, stepOut, pause } = useDebugStore();
   const { selectedConfig, configs, selectConfig, loadConfigs } = useConfigStore();
+  const [showNoConfigModal, setShowNoConfigModal] = useState(false);
 
   const handleStart = () => {
     if (selectedConfig) {
       startSession(selectedConfig);
+    } else {
+      setShowNoConfigModal(true);
     }
   };
 
@@ -170,6 +174,35 @@ export function Toolbar() {
       <div className="text-sm text-secondary">
         {isSessionActive && (isPaused ? '⏸ Paused' : '▶ Running')}
       </div>
+
+      {/* No Config Modal */}
+      {showNoConfigModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-panel border border-border rounded-lg shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-text mb-2">No Debug Configuration</h3>
+            <p className="text-sm text-secondary mb-4">
+              You need a <code className="bg-elevated px-1 rounded">.vscode/launch.json</code> file to start debugging. Open a folder that contains one, or create it now.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowNoConfigModal(false)}
+                className="px-4 py-2 text-sm text-secondary hover:text-text"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowNoConfigModal(false);
+                  createLaunchJson();
+                }}
+                className="px-4 py-2 text-sm bg-accent text-accent-text rounded hover:opacity-90"
+              >
+                Create launch.json
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

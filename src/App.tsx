@@ -14,8 +14,8 @@ const COLLAPSE_THRESHOLD = 120;
 const MIN_EDITOR_WIDTH = 300;
 
 function App() {
-  const { initialize, isSessionActive } = useDebugStore();
-  const { loadConfigs, setWorkspaceRoot, loadTheme } = useConfigStore();
+  const { initialize, isSessionActive, isPaused, startSession, stopSession, continue: continueExecution, stepOver, stepInto, stepOut } = useDebugStore();
+  const { loadConfigs, setWorkspaceRoot, loadTheme, selectedConfig } = useConfigStore();
   const { openFile } = useEditorStore();
   const [explorerWidth, setExplorerWidth] = useState(250);
   const [sidebarWidth, setSidebarWidth] = useState(280);
@@ -74,6 +74,73 @@ function App() {
     observer.observe(editorRef.current);
     return () => observer.disconnect();
   }, [isEditorCollapsed, explorerWidth, sidebarWidth]);
+
+  // Keyboard shortcuts for debugging
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input, textarea, or contenteditable
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // Shift+F5: Stop
+      if (e.key === 'F5' && e.shiftKey) {
+        e.preventDefault();
+        if (isSessionActive) {
+          stopSession();
+        }
+        return;
+      }
+
+      // F5: Start / Continue
+      if (e.key === 'F5') {
+        e.preventDefault();
+        if (!isSessionActive) {
+          if (selectedConfig) {
+            startSession(selectedConfig);
+          }
+        } else if (isPaused) {
+          continueExecution();
+        }
+        return;
+      }
+
+      // F10: Step Over
+      if (e.key === 'F10') {
+        e.preventDefault();
+        if (isSessionActive && isPaused) {
+          stepOver();
+        }
+        return;
+      }
+
+      // Shift+F11: Step Out
+      if (e.key === 'F11' && e.shiftKey) {
+        e.preventDefault();
+        if (isSessionActive && isPaused) {
+          stepOut();
+        }
+        return;
+      }
+
+      // F11: Step Into
+      if (e.key === 'F11') {
+        e.preventDefault();
+        if (isSessionActive && isPaused) {
+          stepInto();
+        }
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSessionActive, isPaused, selectedConfig, startSession, continueExecution, stopSession, stepOver, stepInto, stepOut]);
 
   const handleFileSelect = useCallback((path: string) => {
     openFile(path);
@@ -150,13 +217,19 @@ function App() {
       <div className="flex flex-1 overflow-hidden" ref={mainRef}>
         {isEditorCollapsed ? (
           <>
-            {/* Explorer takes half the remaining space when editor is collapsed */}
-            <div className="flex-1 min-w-0 bg-panel border-r border-border overflow-hidden flex flex-col">
+            {/* Resizable explorer panel */}
+            <ResizablePanel
+              defaultWidth={explorerWidth}
+              minWidth={150}
+              maxWidth={2000}
+              onResize={setExplorerWidth}
+              className="border-r border-border"
+            >
               <FileExplorer onFileSelect={handleFileSelect} />
-            </div>
+            </ResizablePanel>
 
-            {/* Sidebar takes half the remaining space */}
-            <div className="flex-1 min-w-0 bg-panel overflow-hidden">
+            {/* Sidebar fills remaining space */}
+            <div className="flex-1 min-w-0 bg-panel overflow-hidden" style={{ minWidth: 150 }}>
               <Sidebar />
             </div>
 
