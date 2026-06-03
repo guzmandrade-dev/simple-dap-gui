@@ -50,6 +50,8 @@ export interface ElectronAPI {
   debugStepOut: () => Promise<{ success: boolean }>;
   debugPause: () => Promise<{ success: boolean }>;
   debugSetBreakpoints: (filePath: string, lines: number[]) => Promise<{ success: boolean }>;
+  debugFetchVariables: (variablesReference: number) => Promise<{ success: boolean; variables: unknown[] }>;
+  debugEvaluate: (expression: string, frameId?: number) => Promise<{ success: boolean; result: unknown }>;
   debugIsActive: () => Promise<boolean>;
   
   // Debug event listeners
@@ -57,6 +59,7 @@ export interface ElectronAPI {
   onDapStackTrace: (callback: (body: unknown) => void) => () => void;
   onDapScopes: (callback: (body: unknown) => void) => () => void;
   onDapVariables: (callback: (data: unknown) => void) => () => void;
+  onDapChildVariables: (callback: (data: unknown) => void) => () => void;
   onDapTerminated: (callback: () => void) => () => void;
   onDapExited: (callback: () => void) => () => void;
   

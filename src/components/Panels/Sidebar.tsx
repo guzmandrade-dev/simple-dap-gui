@@ -5,7 +5,9 @@ import { BreakpointsPanel } from './BreakpointsPanel';
 import { AdapterManagerPanel } from './AdapterManagerPanel';
 import { SettingsPanel } from './SettingsPanel';
 
-type Tab = 'stack' | 'variables' | 'breakpoints' | 'adapters' | 'settings';
+import { WatchPanel } from './WatchPanel';
+
+type Tab = 'stack' | 'variables' | 'watch' | 'breakpoints' | 'adapters' | 'settings';
 
 interface SidebarProps {
   className?: string;
@@ -17,6 +19,7 @@ export function Sidebar({ className }: SidebarProps) {
   const tabs = [
     { id: 'stack' as Tab, label: 'Stack', icon: '📞', title: 'Call Stack' },
     { id: 'variables' as Tab, label: 'Vars', icon: '📊', title: 'Variables' },
+    { id: 'watch' as Tab, label: 'Watch', icon: '👁️', title: 'Watch' },
     { id: 'breakpoints' as Tab, label: 'BP', icon: '🔴', title: 'Breakpoints' },
     { id: 'adapters' as Tab, label: 'Adapters', icon: '🔌', title: 'Debug Adapters' },
     { id: 'settings' as Tab, label: '', icon: '⚙️', title: 'Settings' },
@@ -45,6 +48,7 @@ export function Sidebar({ className }: SidebarProps) {
       <div className="flex-1 overflow-auto">
         {activeTab === 'stack' && <CallStackPanel />}
         {activeTab === 'variables' && <VariablesPanel />}
+        {activeTab === 'watch' && <WatchPanel />}
         {activeTab === 'breakpoints' && <BreakpointsPanel />}
         {activeTab === 'adapters' && <AdapterManagerPanel />}
         {activeTab === 'settings' && <SettingsPanel />}

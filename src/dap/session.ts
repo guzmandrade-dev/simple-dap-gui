@@ -209,6 +209,34 @@ export class DebugSession {
     }
   }
 
+  async fetchChildVariables(variablesReference: number) {
+    const response = await this.client.sendRequest('variables', {
+      variablesReference,
+    }) as DebugProtocol.VariablesResponse;
+
+    this.client.emit('childVariables', {
+      variablesReference,
+      variables: response.body.variables,
+    });
+  }
+
+  async evaluate(expression: string, frameId?: number) {
+    const response = await this.client.sendRequest('evaluate', {
+      expression,
+      frameId,
+      context: 'watch',
+    }) as DebugProtocol.EvaluateResponse;
+
+    this.client.emit('evaluate', {
+      expression,
+      result: response.body.result,
+      type: response.body.type,
+      variablesReference: response.body.variablesReference,
+    });
+
+    return response.body;
+  }
+
   async disconnect(restart?: boolean) {
     try {
       await this.client.sendRequest('disconnect', { restart });

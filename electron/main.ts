@@ -151,6 +151,19 @@ class DebugSessionManager {
     await this.session?.setBreakpoints(filePath, lines);
   }
 
+  async fetchVariables(variablesReference: number): Promise<DebugProtocol.Variable[]> {
+    if (!this.session) return [];
+    const response = await this.session.client.sendRequest('variables', {
+      variablesReference,
+    }) as DebugProtocol.VariablesResponse;
+    return response.body.variables;
+  }
+
+  async evaluate(expression: string, frameId?: number): Promise<DebugProtocol.EvaluateResponse['body'] | null> {
+    if (!this.session) return null;
+    return this.session.evaluate(expression, frameId);
+  }
+
   isActive(): boolean {
     return this.session !== null;
   }
@@ -206,6 +219,10 @@ class DebugSessionManager {
 
     this.session.client.on('variables', (data: { frameId: number; scopeId: number; variables: DebugProtocol.Variable[] }) => {
       mainWindow?.webContents.send('dap-variables', data);
+    });
+
+    this.session.client.on('childVariables', (data: { variablesReference: number; variables: DebugProtocol.Variable[] }) => {
+      mainWindow?.webContents.send('dap-child-variables', data);
     });
 
     this.session.client.on('terminated', () => {
@@ -604,6 +621,16 @@ ipcMain.handle('debug-pause', async () => {
 ipcMain.handle('debug-set-breakpoints', async (_event, filePath: string, lines: number[]) => {
   await debugManager.setBreakpoints(filePath, lines);
   return { success: true };
+});
+
+ipcMain.handle('debug-fetch-variables', async (_event, variablesReference: number) => {
+  const variables = await debugManager.fetchVariables(variablesReference);
+  return { success: true, variables };
+});
+
+ipcMain.handle('debug-evaluate', async (_event, expression: string, frameId?: number) => {
+  const result = await debugManager.evaluate(expression, frameId);
+  return { success: !!result, result };
 });
 
 ipcMain.handle('debug-is-active', () => {

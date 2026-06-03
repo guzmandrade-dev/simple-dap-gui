@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { DebugProtocol } from '@vscode/debugprotocol';
 import { useDebugStore } from '../../stores/debugStore';
 
 export function VariablesPanel() {
   const { variables, currentFrameId, isSessionActive } = useDebugStore();
-  
+
   const frameVariables = currentFrameId ? variables.get(currentFrameId) || [] : [];
 
   if (!isSessionActive) {
@@ -36,8 +36,8 @@ export function VariablesPanel() {
       <h3 className="text-xs font-bold text-secondary uppercase mb-2 px-2">Variables</h3>
       <div className="font-mono text-sm">
         {frameVariables.map((variable) => (
-          <VariableTree 
-            key={variable.name} 
+          <VariableTree
+            key={variable.name}
             variable={variable}
             depth={0}
           />
@@ -54,29 +54,54 @@ interface VariableTreeProps {
 
 function VariableTree({ variable, depth }: VariableTreeProps) {
   const [expanded, setExpanded] = useState(false);
-  
+  const [loading, setLoading] = useState(false);
+  const { variables, fetchChildVariables } = useDebugStore();
+
   const hasChildren = variable.variablesReference > 0;
-  
+  const childVars = hasChildren ? variables.get(variable.variablesReference) : undefined;
+
+  const handleToggle = useCallback(async () => {
+    if (!hasChildren) return;
+
+    if (!expanded && childVars === undefined) {
+      setLoading(true);
+      try {
+        await fetchChildVariables(variable.variablesReference);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    setExpanded(!expanded);
+  }, [expanded, hasChildren, childVars, fetchChildVariables, variable.variablesReference]);
+
   return (
     <div style={{ marginLeft: depth * 12 }}>
-      <div 
-        className="flex items-center gap-1 cursor-pointer p-1"
-        onClick={() => hasChildren && setExpanded(!expanded)}
+      <div
+        className="grid grid-cols-[auto_1fr] gap-x-1 items-start cursor-pointer p-1"
+        onClick={handleToggle}
       >
-        {hasChildren && (
-          <span className="text-muted text-xs w-4">
-            {expanded ? '▼' : '▶'}
-          </span>
-        )}
-        {!hasChildren && <span className="w-4" />}
-        <span className="text-accent">{variable.name}</span>
-        <span className="text-muted">=</span>
-        <span className={getValueColor(variable.type)}>{variable.value}</span>
+        <div className="flex items-center gap-1 shrink-0">
+          {hasChildren && (
+            <span className="text-muted text-xs w-4 text-center">
+              {loading ? '⏳' : expanded ? '▼' : '▶'}
+            </span>
+          )}
+          {!hasChildren && <span className="w-4" />}
+          <span className="text-accent">{variable.name}</span>
+          <span className="text-muted">=</span>
+        </div>
+        <span className={getValueColor(variable.type) + ' break-all'}>{variable.value}</span>
       </div>
-      {expanded && hasChildren && (
-        <div className="text-secondary italic pl-5">
-          {/* Children would be fetched here */}
-          [Expandable]
+      {expanded && hasChildren && childVars !== undefined && (
+        <div>
+          {childVars.map((child) => (
+            <VariableTree
+              key={child.name}
+              variable={child}
+              depth={depth + 1}
+            />
+          ))}
         </div>
       )}
     </div>

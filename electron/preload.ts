@@ -38,6 +38,8 @@ export interface ElectronAPI {
   debugStepOut: () => Promise<{ success: boolean }>;
   debugPause: () => Promise<{ success: boolean }>;
   debugSetBreakpoints: (filePath: string, lines: number[]) => Promise<{ success: boolean }>;
+  debugFetchVariables: (variablesReference: number) => Promise<{ success: boolean; variables: unknown[] }>;
+  debugEvaluate: (expression: string, frameId?: number) => Promise<{ success: boolean; result: unknown }>;
   debugIsActive: () => Promise<boolean>;
   
   // DAP Events
@@ -45,6 +47,7 @@ export interface ElectronAPI {
   onDapStackTrace: (callback: (body: unknown) => void) => () => void;
   onDapScopes: (callback: (body: unknown) => void) => () => void;
   onDapVariables: (callback: (data: unknown) => void) => () => void;
+  onDapChildVariables: (callback: (data: unknown) => void) => () => void;
   onDapTerminated: (callback: () => void) => () => void;
   onDapExited: (callback: () => void) => () => void;
   
@@ -128,6 +131,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   debugPause: () => ipcRenderer.invoke('debug-pause'),
   debugSetBreakpoints: (filePath: string, lines: number[]) => 
     ipcRenderer.invoke('debug-set-breakpoints', filePath, lines),
+  debugFetchVariables: (variablesReference: number) =>
+    ipcRenderer.invoke('debug-fetch-variables', variablesReference),
+  debugEvaluate: (expression: string, frameId?: number) =>
+    ipcRenderer.invoke('debug-evaluate', expression, frameId),
   debugIsActive: () => ipcRenderer.invoke('debug-is-active'),
   
   // DAP Events
@@ -150,6 +157,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (_event: unknown, data: unknown) => callback(data);
     ipcRenderer.on('dap-variables', handler);
     return () => ipcRenderer.removeListener('dap-variables', handler);
+  },
+  onDapChildVariables: (callback: (data: unknown) => void) => {
+    const handler = (_event: unknown, data: unknown) => callback(data);
+    ipcRenderer.on('dap-child-variables', handler);
+    return () => ipcRenderer.removeListener('dap-child-variables', handler);
   },
   onDapTerminated: (callback: () => void) => {
     const handler = () => callback();

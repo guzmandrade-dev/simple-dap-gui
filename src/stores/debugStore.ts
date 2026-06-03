@@ -27,6 +27,9 @@ interface DebugState {
   workspaceRoot: string;
   recentConfigs: LaunchConfiguration[];
 
+  // Watch expressions
+  watches: Array<{ id: string; expression: string; result?: string; type?: string; variablesReference?: number }>;
+
   // Actions
   initialize: () => Promise<void>;
   startSession: (config: LaunchConfiguration) => Promise<void>;
@@ -43,6 +46,14 @@ interface DebugState {
   onStackTrace: (body: DebugProtocol.StackTraceResponse['body']) => void;
   onScopes: (body: DebugProtocol.ScopesResponse['body']) => void;
   onVariables: (data: { frameId: number; scopeId: number; variables: DebugProtocol.Variable[] }) => void;
+  onChildVariables: (data: { variablesReference: number; variables: DebugProtocol.Variable[] }) => void;
+  fetchChildVariables: (variablesReference: number) => Promise<void>;
+
+  // Watch management
+  addWatch: (expression: string) => void;
+  removeWatch: (id: string) => void;
+  evaluateWatches: () => Promise<void>;
+  onEvaluate: (data: { expression: string; result: string; type?: string; variablesReference?: number }) => void;
 
   // Breakpoint management
   setBreakpoint: (file: string, line: number) => Promise<void>;
@@ -67,6 +78,7 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
   breakpointVerified: new Map(),
   workspaceRoot: '',
   recentConfigs: [],
+  watches: [],
 
   initialize: async () => {
     // Get workspace root from Electron
@@ -89,6 +101,10 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
     
       window.electronAPI.onDapVariables((data) => {
         get().onVariables(data as { frameId: number; scopeId: number; variables: DebugProtocol.Variable[] });
+      });
+    
+      window.electronAPI.onDapChildVariables((data) => {
+        get().onChildVariables(data as { variablesReference: number; variables: DebugProtocol.Variable[] });
       });
       
       window.electronAPI.onDapTerminated(() => {
@@ -160,6 +176,8 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
           currentLine: topFrame.line,
           currentFrameId: topFrame.id,
         });
+        // Re-evaluate watches for the new frame
+        get().evaluateWatches();
       });
     }
   },
@@ -174,6 +192,74 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
     frameVars.push(...data.variables);
     variables.set(data.frameId, frameVars);
     set({ variables: new Map(variables) });
+  },
+
+  onChildVariables: (data) => {
+    const { variables } = get();
+    variables.set(data.variablesReference, data.variables);
+    set({ variables: new Map(variables) });
+  },
+
+  fetchChildVariables: async (variablesReference) => {
+    const result = await window.electronAPI?.debugFetchVariables(variablesReference);
+    if (result?.success && result.variables) {
+      const { variables } = get();
+      variables.set(variablesReference, result.variables as DebugProtocol.Variable[]);
+      set({ variables: new Map(variables) });
+    }
+  },
+
+  addWatch: (expression) => {
+    const watches = [...get().watches];
+    watches.push({
+      id: crypto.randomUUID(),
+      expression,
+    });
+    set({ watches });
+    // Evaluate immediately if paused
+    if (get().isPaused) {
+      get().evaluateWatches();
+    }
+  },
+
+  removeWatch: (id) => {
+    set({ watches: get().watches.filter(w => w.id !== id) });
+  },
+
+  evaluateWatches: async () => {
+    const { watches, currentFrameId } = get();
+    if (watches.length === 0) return;
+
+    const results = await Promise.all(
+      watches.map(async (watch) => {
+        try {
+          const result = await window.electronAPI?.debugEvaluate(watch.expression, currentFrameId);
+          if (result?.success && result.result) {
+            const body = result.result as { result: string; type?: string; variablesReference?: number };
+            return {
+              ...watch,
+              result: body.result,
+              type: body.type,
+              variablesReference: body.variablesReference,
+            };
+          }
+          return { ...watch, result: 'Error', type: 'error' };
+        } catch {
+          return { ...watch, result: 'Error', type: 'error' };
+        }
+      })
+    );
+
+    set({ watches: results });
+  },
+
+  onEvaluate: (data) => {
+    const watches = get().watches.map((w) =>
+      w.expression === data.expression
+        ? { ...w, result: data.result, type: data.type, variablesReference: data.variablesReference }
+        : w
+    );
+    set({ watches });
   },
 
   stopSession: async () => {
