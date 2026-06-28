@@ -239,7 +239,7 @@ export function SettingsPanel() {
       <section className="border-t border-border-subtle pt-4">
         <h3 className="text-sm font-medium text-text mb-1">About</h3>
         <p className="text-xs text-text-muted">
-          simple-dap-gui v0.3.2<br />
+          simple-dap-gui v0.4.0<br />
           A DAP Debugger GUI built with Electron
         </p>
       </section>

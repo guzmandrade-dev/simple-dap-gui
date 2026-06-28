@@ -17,9 +17,10 @@ A standalone DAP (Debug Adapter Protocol) client GUI application built with Elec
 - **Watch Panel**: Evaluate and monitor custom expressions while debugging
 - **Dark/Light Theme**: Toggle between dark and light editor themes via settings
 - **Debug Adapter Management**: Built-in manager to install/uninstall DAP adapters (custom .vsix install supported)
-- **Lazy File Loading**: File tree loads directories on-demand with recursive expansion
+- **App Logo & Icons**: Simple code-brackets SVG brand mark, generated as PNG/ICO assets for all platforms
 - **Workspace Integration**: Open workspace directly in your preferred external editor
-- **Collapsible Layout**: Collapse the editor panel to focus on file explorer and debug tools
+- **Current Line Highlight**: The active execution line is highlighted with a theme-aware color in both the gutter and the code view
+- **Monochrome Tool UI**: Flat, borderless chrome with a single accent color and monochrome SVG icons
 - **Keyboard Shortcuts**: Standard debug shortcuts (F5, F10, F11, Shift+F5, Shift+F11)
 
 ## Screenshots
@@ -151,10 +152,11 @@ Install, uninstall, and manage DAP adapters. The built-in catalog currently list
 
 Configure your preferred editor in the **Settings** panel:
 - **VS Code** (default): `code`
-- **Cursor**, **Zed**, **Sublime Text**, **Vim**, **Neovim**
+- **Zed**: `zed`
+- **Vim** (terminal): `vim`
 - **Custom command** with argument templates (`{file}`, `{line}`)
 
-Use **"Open Workspace in Editor"** to open the current workspace root directly.
+Use **"Open Workspace in Editor"** to open the current workspace root directly. External editor commands are resolved against your PATH (`where` on Windows, `which` on macOS/Linux) with a fallback to common install locations.
 
 ## Collapsible Layout
 
@@ -219,14 +221,13 @@ By default, breakpoints are kept in memory only. To save them across sessions:
 
 ## File Reload
 
-The code viewer always loads the latest file content from disk when you open a file. If you edit a file in an external editor while it's already open, click the **🔄 Reload** button in the editor toolbar to refresh the content.
+The code viewer always loads the latest file content from disk when you open a file. If you edit a file in an external editor while it's already open, click the **Reload** button in the editor toolbar to refresh the content.
 
 ## Troubleshooting
 
 - **Adapter not found**: Make sure to install the appropriate debug adapter for your language
-- **Breakpoints not hit**: Check path mappings configuration
-- **Connection refused**: Ensure the debug server is running and listening on the correct port
-- **Spawn node ENOENT on Windows**: The app now uses `process.execPath` with `ELECTRON_RUN_AS_NODE` to reliably spawn adapters in packaged builds
+- **Breakpoints not hit**: Check path mappings configuration. Paths that contain `${workspaceFolder}` are resolved against the opened workspace root.
+- **External editor not found**: Make sure the editor is on your PATH, or use the full path in the Custom editor setting
 
 ## License
 
