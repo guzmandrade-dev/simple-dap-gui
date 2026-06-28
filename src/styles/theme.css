@@ -8,21 +8,34 @@
 
 /* === CSS Custom Properties (defaults = dark) === */
 :root {
-  --color-bg: #111827;
-  --color-bg-secondary: #1f2937;
-  --color-bg-tertiary: #374151;
-  --color-text: #f3f4f6;
-  --color-text-secondary: #9ca3af;
+  --color-bg: #0f1115;
+  --color-bg-secondary: #181b21;
+  --color-bg-tertiary: #21252d;
+  --color-bg-hover: #2a2f38;
+  --color-text: #f0f1f3;
+  --color-text-secondary: #a8adb8;
   --color-text-muted: #6b7280;
-  --color-border: #374151;
-  --color-accent: #2563eb;
+  --color-border: #2c3038;
+  --color-border-subtle: #1f2229;
+  --color-accent: #4f8ef7;
   --color-accent-text: #ffffff;
-  --color-success: #16a34a;
-  --color-success-text: #ffffff;
-  --color-danger: #dc2626;
-  --color-danger-text: #ffffff;
-  --color-warning: #ca8a04;
-  --color-warning-text: #ffffff;
+  --color-accent-muted: #3b6cb8;
+  --color-success: #3dbf6e;
+  --color-success-text: #0f1115;
+  --color-danger: #e35c5c;
+  --color-danger-text: #0f1115;
+  --color-warning: #e8a13a;
+  --color-warning-text: #0f1115;
+  --color-current-line: rgba(232, 161, 58, 0.12);
+
+  /* Syntax tokens */
+  --syntax-comment: #6b7280;
+  --syntax-punctuation: #a8adb8;
+  --syntax-keyword: #7dd3fc;
+  --syntax-string: #a5d6a7;
+  --syntax-function: #ffd54f;
+  --syntax-number: #f48fb1;
+  --syntax-variable: #ffab91;
 }
 
 /* === Base === */
@@ -39,12 +52,14 @@ body {
     Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   font-size: 13px;
   line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* === Scrollbar (native look, system colors) === */
+/* === Scrollbar (thin, neutral) === */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -52,6 +67,11 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
+  background: var(--color-bg-tertiary);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
 }
 
@@ -71,7 +91,7 @@ body {
 
 /* === Font mono === */
 .font-mono {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
 /* === Drag regions (Electron) === */
@@ -87,13 +107,13 @@ body {
 button:focus-visible,
 select:focus-visible,
 input:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 1px solid var(--color-accent);
   outline-offset: 1px;
 }
 
 /* === Panel item states === */
 .panel-item:hover {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-hover);
 }
 
 .panel-item-active {
@@ -108,16 +128,97 @@ input:focus-visible {
   transform: rotate(180deg);
 }
 
-/* PrismJS syntax highlighting tokens */
+/* === Generic button base === */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  border-radius: 0.25rem;
+  border: 1px solid transparent;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+  transition: background-color 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+}
+
+.btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-muted);
+  border-color: transparent;
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  color: var(--color-danger-text);
+}
+
+.btn-danger:hover {
+  filter: brightness(0.9);
+  border-color: transparent;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.btn-ghost:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.btn-outline:hover {
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-text-muted);
+}
+
+/* === Inputs === */
+input, select {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+}
+
+input:hover, select:hover {
+  border-color: var(--color-text-muted);
+}
+
+/* === PrismJS syntax highlighting tokens === */
 .token.comment,
 .token.prolog,
 .token.doctype,
 .token.cdata {
-  color: var(--color-text-muted);
+  color: var(--syntax-comment);
 }
 
 .token.punctuation {
-  color: var(--color-text-secondary);
+  color: var(--syntax-punctuation);
 }
 
 .token.property,
@@ -127,7 +228,7 @@ input:focus-visible {
 .token.constant,
 .token.symbol,
 .token.deleted {
-  color: #f472b6;
+  color: var(--syntax-number);
 }
 
 .token.selector,
@@ -136,7 +237,7 @@ input:focus-visible {
 .token.char,
 .token.builtin,
 .token.inserted {
-  color: #a3e635;
+  color: var(--syntax-string);
 }
 
 .token.operator,
@@ -144,24 +245,24 @@ input:focus-visible {
 .token.url,
 .language-css .token.string,
 .style .token.string {
-  color: var(--color-text-secondary);
+  color: var(--syntax-punctuation);
 }
 
 .token.atrule,
 .token.attr-value,
 .token.keyword {
-  color: #60a5fa;
+  color: var(--syntax-keyword);
 }
 
 .token.function,
 .token.class-name {
-  color: #fbbf24;
+  color: var(--syntax-function);
 }
 
 .token.regex,
 .token.important,
 .token.variable {
-  color: #f87171;
+  color: var(--syntax-variable);
 }
 
 .token.important,

@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
     "build:renderer": "vite build",
+    "build:icons": "node scripts/build-icons.js",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "postinstall": "electron-builder install-app-deps",
@@ -47,6 +48,7 @@
     "eslint-plugin-react-refresh": "^0.4.5",
     "jsdom": "^29.1.1",
     "postcss": "^8.4.32",
+    "sharp": "^0.35.2",
     "tailwindcss": "^3.3.6",
     "typescript": "^5.3.3",
     "vite": "^5.0.8",
@@ -70,17 +72,31 @@
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "assets/**/*"
     ],
+    "icon": "assets/icon.png",
     "mac": {
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "linux": {
-      "target": ["AppImage", "deb", "tar.gz", "tar.xz"],
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz",
+        "tar.xz"
+      ],
       "category": "Development"
     },
     "win": {
-      "target": ["nsis", "zip", "portable"]
+      "target": [
+        "nsis",
+        "zip",
+        "portable"
+      ]
     },
     "publish": {
       "provider": "github",

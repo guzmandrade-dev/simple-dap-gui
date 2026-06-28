@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { watch as fsWatch, FSWatcher } from 'fs';
+import { watch as fsWatch, FSWatcher, existsSync } from 'fs';
 import { ADAPTER_CATALOG, AdapterInfo, InstalledAdapterManifest } from '../src/utils/adapterManager';
 import { DebugSession } from '../src/dap/session';
 import { LaunchConfiguration } from '../src/dap/types';
@@ -102,7 +102,7 @@ class DebugSessionManager {
   async start(config: LaunchConfiguration, initialBreakpoints?: Map<string, number[]>): Promise<void> {
     const workspaceRoot = currentProjectPath || process.cwd();
     this.session = new DebugSession(config, workspaceRoot);
-    
+
     // Queue any breakpoints that were set before the session started
     if (initialBreakpoints) {
       for (const [filePath, lines] of initialBreakpoints) {
@@ -259,6 +259,7 @@ const createWindow = () => {
     height: 900,
     minWidth: 800,
     minHeight: 600,
+    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -485,15 +486,106 @@ ipcMain.handle('window-close', () => {
 
 // Execute command
 ipcMain.handle('exec-command', async (_event, command: string) => {
-  const { exec } = await import('child_process');
+  const { spawn, execFile } = await import('child_process');
+  const path = await import('path');
+
+  // Try to resolve the first bare executable name against PATH (where/which)
+  // and a short list of common install directories on Windows.
+  async function resolveExecutable(cmd: string): Promise<string> {
+    const firstToken = cmd.trim().split(/\s+/)[0];
+    if (!firstToken) return cmd;
+    // Already an absolute or relative path: leave it alone.
+    if (firstToken.includes(path.sep) || firstToken.includes('/')) return cmd;
+
+    const platform = process.platform;
+    const resolver = platform === 'win32' ? 'where.exe' : 'which';
+
+    return new Promise((resolve) => {
+      execFile(resolver, [firstToken], { env: process.env }, (err, stdout) => {
+        if (!err && stdout.trim()) {
+          const resolved = stdout.trim().split(/\r?\n/)[0];
+          resolve(cmd.replace(firstToken, resolved));
+          return;
+        }
+
+        if (platform === 'win32') {
+          const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+          const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+          const localAppData = process.env['LOCALAPPDATA'] || '';
+          const candidates = [
+            path.join(programFiles, 'Vim', 'vim91', `${firstToken}.exe`),
+            path.join(programFiles, 'Vim', 'vim90', `${firstToken}.exe`),
+            path.join(programFiles, 'Vim', 'vim82', `${firstToken}.exe`),
+            path.join(programFilesX86, 'Vim', 'vim91', `${firstToken}.exe`),
+            path.join(programFilesX86, 'Vim', 'vim90', `${firstToken}.exe`),
+            path.join(programFilesX86, 'Vim', 'vim82', `${firstToken}.exe`),
+            path.join(programFiles, 'Neovim', 'bin', `${firstToken}.exe`),
+            path.join(localAppData, 'Programs', 'Microsoft VS Code', 'bin', `${firstToken}.cmd`),
+            path.join(programFiles, 'Microsoft VS Code', 'bin', `${firstToken}.cmd`),
+            path.join(programFilesX86, 'Microsoft VS Code', 'bin', `${firstToken}.cmd`),
+            `C:\\tools\\${firstToken}.exe`,
+          ];
+          for (const candidate of candidates) {
+            if (existsSync(candidate)) {
+              resolve(cmd.replace(firstToken, candidate));
+              return;
+            }
+          }
+        }
+
+        resolve(cmd);
+      });
+    });
+  }
+
+  const resolvedCommand = await resolveExecutable(command);
+
   return new Promise((resolve, reject) => {
-    exec(command, (error, stdout, stderr) => {
-      if (error) {
-        reject(error.message);
+    // On Windows, prefer cmd.exe so the user's PATH has a chance to be inherited.
+    // On Unix, prefer the user's login shell.
+    const shell = process.platform === 'win32'
+      ? process.env.ComSpec || 'cmd.exe'
+      : process.env.SHELL || '/bin/sh';
+
+    // Use spawn with shell + detached so GUI editors (gvim, code, zed) open
+    // without blocking the main process. stdio is ignored because we only care
+    // about whether the command could be started.
+    const child = spawn(resolvedCommand, [], {
+      shell,
+      env: process.env,
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+
+    let errorMessage: string | null = null;
+
+    child.on('error', (err) => {
+      errorMessage = err.message;
+      console.error(`[exec-command] Spawn error: ${err.message}`);
+    });
+
+    child.on('spawn', () => {
+      child.unref();
+    });
+
+    child.on('exit', (code) => {
+      if (errorMessage || (code !== 0 && code !== null)) {
+        const msg = errorMessage || `Command exited with code ${code}`;
+        reject(msg);
       } else {
-        resolve({ stdout, stderr });
+        resolve({ stdout: '', stderr: '' });
       }
     });
+
+    // Give Windows a moment to report spawn errors before resolving.
+    setTimeout(() => {
+      if (errorMessage) {
+        reject(errorMessage);
+      } else {
+        resolve({ stdout: '', stderr: '' });
+      }
+    }, 500);
   });
 });
 

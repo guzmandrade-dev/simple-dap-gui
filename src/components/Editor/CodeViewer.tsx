@@ -44,6 +44,12 @@ const prismLanguageMap: Record<string, string> = {
 
 const MAX_RENDER_LINES = 10_000;
 
+function quotePath(filePath: string): string {
+  // Wrap paths in double quotes and escape any existing double quotes so
+  // spaces and special characters don't break the shell command.
+  return `"${filePath.replace(/"/g, '\\"')}"`;
+}
+
 function getPrismLanguage(filePath: string): string | null {
   const lang = getLanguageForFile(filePath);
   const mapped = prismLanguageMap[lang];
@@ -148,7 +154,7 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
     if (!currentFile) return;
     const line = currentLine || 1;
     const args = settings.editorArgs
-      .replace('{file}', currentFile)
+      .replace('{file}', quotePath(currentFile))
       .replace('{line}', line.toString());
     try {
       await window.electronAPI?.execCommand?.(`${settings.editorCommand} ${args}`);
@@ -208,11 +214,10 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
 
   if (!currentFile) {
     return (
-      <div className={`${className} flex items-center justify-center bg-surface text-muted`}>
+      <div className={`${className} flex items-center justify-center bg-bg text-text-muted`}>
         <div className="text-center">
-          <div className="text-4xl mb-2">📁</div>
-          <div>No file open</div>
-          <div className="text-sm mt-2">Open a file from the explorer to view code</div>
+          <div className="text-2xl mb-2 text-text-secondary">No file open</div>
+          <div className="text-sm">Open a file from the explorer to view code</div>
         </div>
       </div>
     );
@@ -220,50 +225,42 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
 
   return (
     <div className={`${className} h-full flex flex-col`}>
-      {/* Toolbar */}
-      <div className="h-9 bg-panel border-b border-border flex items-center justify-between px-3 flex-shrink-0">
+      <div className="h-9 bg-bg-secondary border-b border-border-subtle flex items-center justify-between px-3 flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <button
             onClick={openInEditor}
-            className="flex items-center gap-1.5 px-2 py-1 text-xs bg-elevated text-secondary shrink-0"
+            className="btn btn-ghost text-xs shrink-0"
             title={`Open in ${settings.editorCommand}`}
           >
-            <span>📝</span>
             <span>Open in Editor</span>
           </button>
           <button
             onClick={() => currentFile && reloadFile(currentFile)}
-            className="flex items-center gap-1.5 px-2 py-1 text-xs bg-elevated text-secondary shrink-0"
+            className="btn btn-ghost text-xs shrink-0"
             title="Reload file from disk"
           >
-            <span>🔄</span>
             <span>Reload</span>
           </button>
-          <span className="text-secondary text-sm truncate" title={currentFile}>
+          <span className="text-text-secondary text-sm truncate" title={currentFile}>
             {fileName}
           </span>
-          {currentLine && (
-            <span className="text-xs text-muted">
-              :{currentLine}
-            </span>
-          )}
+          {currentLine && <span className="text-xs text-text-muted">:{currentLine}</span>}
         </div>
         <button
           onClick={onCollapse}
-          className="w-7 h-7 flex items-center justify-center rounded bg-elevated text-muted hover:text-text hover:bg-border transition-colors shrink-0"
+          className="w-7 h-7 flex items-center justify-center rounded bg-bg-tertiary text-text-secondary hover:text-text hover:bg-hover transition-colors shrink-0"
           title="Collapse editor"
+          aria-label="Collapse editor"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 4l5 4-5 4" />
           </svg>
         </button>
       </div>
 
-      {/* Code area */}
       <div ref={scrollRef} className="flex-1 overflow-auto min-h-0">
         <div className="flex font-mono text-[13px] leading-5">
-          {/* Line numbers / breakpoint gutter */}
-          <div className="flex-shrink-0 select-none text-right bg-panel border-r border-border">
+          <div className="flex-shrink-0 select-none text-right bg-bg-secondary border-r border-border-subtle">
             {visibleLines.map((_, i) => {
               const lineNum = i + 1;
               const hasBP = fileBPs?.has(lineNum);
@@ -274,7 +271,7 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
                   onClick={() => toggleBreakpoint(lineNum)}
                   className={`
                     px-2 cursor-pointer flex items-center justify-end gap-1
-                    ${isCurrent ? 'bg-warning/15 text-warning' : 'text-muted hover:text-text hover:bg-elevated'}
+                    ${isCurrent ? 'bg-current-line text-warning' : 'text-text-muted hover:text-text hover:bg-bg-tertiary'}
                   `}
                   style={{ height: '20px' }}
                   title={hasBP ? 'Remove breakpoint' : 'Add breakpoint'}
@@ -288,7 +285,6 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
             })}
           </div>
 
-          {/* Code lines */}
           <div className="flex-1 min-w-0">
             {visibleLines.map((line, i) => {
               const lineNum = i + 1;
@@ -300,7 +296,7 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
                   key={`line-${lineNum}`}
                   className={`
                     px-3 whitespace-pre
-                    ${isCurrent ? 'bg-warning/15 border-l-2 border-warning' : ''}
+                    ${isCurrent ? 'bg-current-line border-l-2 border-warning' : ''}
                   `}
                   style={{ height: '20px' }}
                   dangerouslySetInnerHTML={{ __html: highlighted || '&nbsp;' }}
@@ -311,8 +307,9 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
         </div>
 
         {isTruncated && (
-          <div className="p-4 text-center text-muted text-sm">
+          <div className="p-4 text-center text-text-muted text-sm">
             File truncated — {lines.length.toLocaleString()} lines total.
+            <br />
             Use "Open in Editor" to view the full file.
           </div>
         )}
@@ -327,10 +324,10 @@ export function CodeViewer(props: CodeViewerProps) {
   return (
     <CodeViewerErrorBoundary
       fallback={
-        <div className={`${props.className} flex items-center justify-center bg-surface text-danger`}>
+        <div className={`${props.className} flex items-center justify-center bg-bg text-danger`}>
           <div className="text-center">
-            <div className="text-lg font-semibold mb-2">⚠️ Viewer Error</div>
-            <div className="text-sm text-muted">The code viewer crashed. Check the DevTools console for details.</div>
+            <div className="text-lg font-medium mb-2">Viewer Error</div>
+            <div className="text-sm text-text-secondary">The code viewer crashed. Check the DevTools console for details.</div>
           </div>
         </div>
       }

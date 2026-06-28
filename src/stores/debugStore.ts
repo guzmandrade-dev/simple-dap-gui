@@ -121,6 +121,7 @@ interface DebugState {
   removeBreakpoint: (file: string, line: number) => Promise<void>;
   toggleBreakpointEnabled: (file: string, line: number) => void;
   isBreakpointEnabled: (file: string, line: number) => boolean;
+  reloadBreakpoints: () => Promise<void>;
 }
 
 export const useDebugStore = create<DebugState>()((set, get) => ({
@@ -453,5 +454,16 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
   isBreakpointEnabled: (file: string, line: number) => {
     const fileBPs = get().breakpoints.get(file);
     return fileBPs?.has(line) || false;
+  },
+
+  reloadBreakpoints: async () => {
+    const root = await window.electronAPI?.getWorkspaceRoot();
+    if (root) {
+      set({ workspaceRoot: root });
+    }
+    const loaded = await loadBreakpoints();
+    if (loaded.size > 0) {
+      set({ breakpoints: loaded });
+    }
   },
 }));

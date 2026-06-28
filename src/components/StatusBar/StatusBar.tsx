@@ -14,32 +14,29 @@ export function StatusBar({ isActive }: StatusBarProps) {
   const fileCount = fileContents.size;
 
   return (
-    <div className="h-6 bg-panel border-t border-border flex items-center px-4 text-xs text-secondary">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1">
-          <span className={`w-2 h-2 ${isActive ? 'bg-success' : 'bg-muted'}`} />
+    <div className="h-7 bg-bg-secondary border-t border-border-subtle flex items-center px-3 text-xs text-text-secondary">
+      <div className="flex items-center gap-4 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-success' : 'bg-text-muted'}`} />
           <span>{isActive ? 'Debugging' : 'Idle'}</span>
         </div>
-        
+
         {workspaceRoot && (
-          <div className="flex items-center gap-2">
-            <span className="text-muted">|</span>
-            <span className="truncate max-w-[400px]" title={workspaceRoot}>{workspaceRoot}</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-text-muted">{workspaceRoot}</span>
           </div>
         )}
-        
+
         {currentFile && (
-          <div className="flex items-center gap-2">
-            <span className="text-muted">|</span>
-            <span className="truncate max-w-[300px]">{currentFile}</span>
-            {currentLine && <span>:{currentLine}</span>}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="truncate max-w-[300px]" title={currentFile}>{currentFile}</span>
+            {currentLine && <span className="text-text-muted">:{currentLine}</span>}
           </div>
         )}
-        
+
         {fileCount > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-muted">|</span>
-            <span>{fileCount} file{fileCount !== 1 ? 's' : ''} open</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-text-muted">{fileCount} file{fileCount !== 1 ? 's' : ''} open</span>
           </div>
         )}
       </div>

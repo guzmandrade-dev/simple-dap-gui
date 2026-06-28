@@ -1,25 +1,31 @@
 import { DAPClient } from './client';
 import { LaunchConfiguration } from './types';
 import { DebugProtocol } from '@vscode/debugprotocol';
+import * as path from 'path';
 
 export class DebugSession {
   client: DAPClient;
   private currentThreadId: number | undefined;
+  private workspaceRoot: string;
   private pathMappings: Record<string, string> = {};
   private pendingBreakpoints = new Map<string, number[]>();
   private isInitialized = false;
   private initializedPromise: Promise<void>;
   private initializedResolve!: () => void;
 
-  constructor(private config: LaunchConfiguration, private workspaceRoot: string = '') {
+  constructor(private config: LaunchConfiguration, workspaceRoot: string = '') {
     this.client = new DAPClient();
     this.setupEventHandlers();
 
-    // Store path mappings from config, resolving ${workspaceFolder}
+    // Always fall back to the current working directory so ${workspaceFolder}
+    // can be resolved even if no folder was explicitly opened.
+    this.workspaceRoot = workspaceRoot || process.cwd();
+
+    // Store raw path mappings. ${workspaceFolder} is resolved lazily so the
+    // most recent workspace root is always used.
     if (config.pathMappings) {
-      this.pathMappings = {};
       for (const [serverPrefix, localPrefix] of Object.entries(config.pathMappings)) {
-        this.pathMappings[serverPrefix] = localPrefix.replace(/\$\{workspaceFolder\}/g, this.workspaceRoot);
+        this.pathMappings[serverPrefix] = localPrefix;
       }
     }
 
@@ -40,7 +46,6 @@ export class DebugSession {
   private async onInitialized() {
     if (this.isInitialized) return;
     this.isInitialized = true;
-    console.log('Adapter initialized event received');
 
     // Send all pending breakpoints that were queued before initialization
     for (const [filePath, lines] of this.pendingBreakpoints) {
@@ -50,7 +55,6 @@ export class DebugSession {
 
     // Notify adapter that configuration is complete so it can start executing
     await this.client.sendRequest('configurationDone');
-    console.log('Configuration done sent');
 
     this.initializedResolve();
   }
@@ -59,7 +63,7 @@ export class DebugSession {
     await this.client.spawn(adapterPath);
 
     // Initialize sequence
-    const initResponse = await this.client.sendRequest('initialize', {
+    await this.client.sendRequest('initialize', {
       clientID: 'simple-dap-gui',
       clientName: 'simple-dap-gui',
       adapterID: this.config.type,
@@ -69,8 +73,6 @@ export class DebugSession {
       supportsVariableType: true,
       supportsRunInTerminalRequest: false,
     }) as DebugProtocol.InitializeResponse;
-
-    console.log('Adapter initialized:', initResponse.body);
 
     if (this.config.request === 'launch') {
       await this.client.sendRequest('launch', this.config);
@@ -83,7 +85,6 @@ export class DebugSession {
   }
 
   private async onStopped(event: DebugProtocol.StoppedEvent['body']) {
-    console.log('Stopped event:', event);
     this.currentThreadId = event.threadId;
 
     // Always fetch stack trace on stop
@@ -136,22 +137,18 @@ export class DebugSession {
   }
 
   private onOutput(event: DebugProtocol.OutputEvent['body']) {
-    console.log('Output:', event.output);
     this.client.emit('outputEvent', event);
   }
 
   private onBreakpointEvent(event: DebugProtocol.BreakpointEvent['body']) {
-    console.log('Breakpoint event:', event);
     this.client.emit('breakpointEvent', event);
   }
 
   private onTerminated(event: DebugProtocol.TerminatedEvent['body']) {
-    console.log('Terminated:', event);
     this.client.emit('terminatedEvent', event);
   }
 
   private onExited(event: DebugProtocol.ExitedEvent['body']) {
-    console.log('Exited with code:', event.exitCode);
     this.client.emit('exitedEvent', event);
   }
 
@@ -250,23 +247,38 @@ export class DebugSession {
     }
   }
 
+  private resolveLocalPrefix(localPrefix: string): string {
+    return localPrefix.replace(/\$\{workspaceFolder\}/g, this.workspaceRoot);
+  }
+
   serverToLocalPath(serverPath: string): string {
-    // Apply path mappings to convert server path to local path
+    // Apply explicit path mappings to convert server path to local path
     for (const [serverPrefix, localPrefix] of Object.entries(this.pathMappings)) {
       if (serverPath.startsWith(serverPrefix)) {
-        return serverPath.replace(serverPrefix, localPrefix);
+        return serverPath.replace(serverPrefix, this.resolveLocalPrefix(localPrefix));
       }
     }
+
+    // Fallback: some adapters embed ${workspaceFolder} directly in the server
+    // path (e.g. /some/prefix/${workspaceFolder}/file.php). Treat the placeholder
+    // as the project root and use everything after it as the relative path.
+    const placeholder = '${workspaceFolder}';
+    const pivot = serverPath.indexOf(placeholder);
+    if (pivot !== -1) {
+      const suffix = serverPath.slice(pivot + placeholder.length);
+      return path.join(this.workspaceRoot, suffix.replace(/^[\\/]+/, ''));
+    }
+
     // If no mapping matches, return as-is
     return serverPath;
   }
 
   private localToServerPath(localPath: string): string {
     // Apply path mappings to convert local path to server path
-    // We need to find the reverse mapping
     for (const [serverPrefix, localPrefix] of Object.entries(this.pathMappings)) {
-      if (localPath.startsWith(localPrefix)) {
-        return localPath.replace(localPrefix, serverPrefix);
+      const resolvedLocal = this.resolveLocalPrefix(localPrefix);
+      if (localPath.startsWith(resolvedLocal)) {
+        return localPath.replace(resolvedLocal, serverPrefix);
       }
     }
     // If no mapping matches, return as-is

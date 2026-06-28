@@ -14,7 +14,7 @@ const COLLAPSE_THRESHOLD = 120;
 const MIN_EDITOR_WIDTH = 300;
 
 function App() {
-  const { initialize, isSessionActive, isPaused, startSession, stopSession, continue: continueExecution, stepOver, stepInto, stepOut } = useDebugStore();
+  const { initialize, isSessionActive, isPaused, startSession, stopSession, continue: continueExecution, stepOver, stepInto, stepOut, reloadBreakpoints } = useDebugStore();
   const { loadConfigs, setWorkspaceRoot, loadTheme, selectedConfig } = useConfigStore();
   const { openFile } = useEditorStore();
   const [explorerWidth, setExplorerWidth] = useState(250);
@@ -35,6 +35,7 @@ function App() {
       try {
         setWorkspaceRoot(path);
         loadConfigs();
+        reloadBreakpoints();
       } catch (err) {
         console.error('Error handling folder opened:', err);
       }
@@ -45,6 +46,7 @@ function App() {
       try {
         setWorkspaceRoot(path);
         loadConfigs();
+        reloadBreakpoints();
       } catch (err) {
         console.error('Error handling workspace changed:', err);
       }
@@ -220,42 +222,40 @@ function App() {
   }, [explorerWidth]);
 
   return (
-    <div className="flex flex-col h-screen bg-surface text-text overflow-hidden">
+    <div className="flex flex-col h-screen bg-bg text-text overflow-hidden">
       <TitleBar />
       <Toolbar />
 
       <div className="flex flex-1 overflow-hidden" ref={mainRef}>
         {isEditorCollapsed ? (
           <>
-            {/* Resizable explorer panel */}
             <ResizablePanel
               defaultWidth={explorerWidth}
               minWidth={150}
               maxWidth={2000}
               onResize={setExplorerWidth}
-              className="border-r border-border"
+              className="border-r border-border-subtle"
             >
               <FileExplorer onFileSelect={handleFileSelect} />
             </ResizablePanel>
 
-            {/* Sidebar fills remaining space */}
-            <div className="flex-1 min-w-0 bg-panel overflow-hidden" style={{ minWidth: 150 }}>
+            <div className="flex-1 min-w-0 bg-bg-secondary overflow-hidden" style={{ minWidth: 150 }}>
               <Sidebar />
             </div>
 
-            {/* Collapsed editor bar on the far right */}
-            <div className="w-10 flex-shrink-0 bg-panel border-l border-border flex flex-col items-center py-4 gap-4">
+            <div className="w-10 flex-shrink-0 bg-bg-secondary border-l border-border-subtle flex flex-col items-center py-4 gap-4">
               <button
                 onClick={handleExpandEditor}
-                className="w-7 h-7 flex items-center justify-center rounded bg-elevated text-muted hover:text-text hover:bg-border transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded bg-bg-tertiary text-text-secondary hover:text-text hover:bg-hover transition-colors"
                 title="Expand editor"
+                aria-label="Expand editor"
               >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M11 4l-5 4 5 4" />
                 </svg>
               </button>
               <div className="w-5 h-px bg-border" />
-              <span className="text-xs text-muted writing-mode-vertical font-medium tracking-wide">Editor</span>
+              <span className="text-xs text-text-muted writing-mode-vertical font-medium tracking-wide">Editor</span>
             </div>
           </>
         ) : (
@@ -265,7 +265,7 @@ function App() {
               minWidth={150}
               maxWidth={400}
               onResize={setExplorerWidth}
-              className="border-r border-border"
+              className="border-r border-border-subtle"
             >
               <FileExplorer onFileSelect={handleFileSelect} />
             </ResizablePanel>
@@ -275,7 +275,7 @@ function App() {
               minWidth={200}
               maxWidth={2000}
               onResize={handleSidebarResize}
-              className="border-r border-border"
+              className="border-r border-border-subtle"
             >
               <Sidebar />
             </ResizablePanel>

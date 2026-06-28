@@ -29,6 +29,50 @@ function updateNodeInTree(
   });
 }
 
+function IconChevron({ className, direction }: { className?: string; direction: 'right' | 'down' }) {
+  return (
+    <svg
+      className={className}
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ transform: direction === 'down' ? 'rotate(90deg)' : undefined }}
+    >
+      <path d="M4 2l4 4-4 4" />
+    </svg>
+  );
+}
+
+function IconFolder({ className, open }: { className?: string; open?: boolean }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      {open ? (
+        <>
+          <path d="M2 4h4l2 2h6v7H2V4z" />
+        </>
+      ) : (
+        <>
+          <path d="M2 3h4l2 2h6v8H2V3z" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function IconFile({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6l-4-4z" />
+      <path d="M9 2v4h4" />
+    </svg>
+  );
+}
+
 export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
   const [rootPath, setRootPath] = useState<string>('');
   const [files, setFiles] = useState<FileNode[]>([]);
@@ -82,7 +126,6 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
         return next;
       });
     } else {
-      // Load children on first expand
       if (node.isDirectory && node.children === undefined) {
         try {
           const result = await window.electronAPI?.readDirectory?.(node.path);
@@ -122,21 +165,19 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
       <div key={node.path}>
         <div
           onClick={() => handleFileClick(node)}
-          className={`
-            flex items-center gap-1 py-1 px-2 cursor-pointer text-sm select-none
-            ${node.isDirectory ? 'text-text' : 'text-secondary'}
-          `}
+          className="flex items-center gap-1 py-1 px-2 cursor-pointer text-sm select-none text-text-secondary hover:text-text hover:bg-bg-tertiary"
           style={{ paddingLeft: `${paddingLeft}px` }}
         >
-          {node.isDirectory && (
-            <span className="text-muted w-4">
-              {isExpanded ? '▼' : '▶'}
+          {node.isDirectory ? (
+            <span className="text-text-muted w-4 flex items-center justify-center">
+              <IconChevron direction={isExpanded ? 'down' : 'right'} />
             </span>
+          ) : (
+            <span className="w-4" />
           )}
-          {!node.isDirectory && <span className="w-4" />}
 
-          <span className="mr-1">
-            {node.isDirectory ? (isExpanded ? '📂' : '📁') : getFileIcon(node.name)}
+          <span className="mr-1.5 text-text-muted">
+            {node.isDirectory ? <IconFolder open={isExpanded} /> : <IconFile />}
           </span>
 
           <span className="truncate">{node.name}</span>
@@ -151,71 +192,36 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
     );
   };
 
-  const getFileIcon = (filename: string): string => {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    switch (ext) {
-      case 'js':
-      case 'ts':
-      case 'jsx':
-      case 'tsx':
-        return '📜';
-      case 'json':
-        return '📋';
-      case 'md':
-        return '📝';
-      case 'html':
-      case 'htm':
-        return '🌐';
-      case 'css':
-      case 'scss':
-      case 'sass':
-        return '🎨';
-      case 'php':
-        return '🐘';
-      case 'py':
-        return '🐍';
-      case 'java':
-        return '☕';
-      case 'c':
-      case 'cpp':
-      case 'h':
-      case 'hpp':
-        return '⚙️';
-      default:
-        return '📄';
-    }
-  };
+  const rootName = rootPath.replace(/\\/g, '/').split('/').pop() || rootPath;
 
   if (!rootPath) {
     return (
-      <div className={`${className} bg-panel flex flex-col h-full`}>
-        <div className="p-3 border-b border-border">
-          <h3 className="text-xs font-bold text-secondary uppercase">Explorer</h3>
+      <div className={`${className} bg-bg-secondary flex flex-col h-full`}>
+        <div className="px-3 py-2 border-b border-border-subtle">
+          <h3 className="text-xs font-medium text-text-muted uppercase">Explorer</h3>
         </div>
-        <div className="flex-1 flex items-center justify-center text-muted text-sm p-4 text-center">
+        <div className="flex-1 flex items-center justify-center text-text-muted text-sm p-4 text-center">
           No folder opened
           <br />
-          <span className="text-xs text-muted">
-            Use File → Open Folder
-          </span>
+          <span className="text-xs">Use File → Open Folder</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`${className} bg-panel flex flex-col h-full`}>
-      <div className="p-3 border-b border-border">
-        <h3 className="text-xs font-bold text-secondary uppercase truncate" title={rootPath}>
-          {rootPath.split('/').pop() || rootPath}
+    <div className={`${className} bg-bg-secondary flex flex-col h-full`}>
+      <div className="px-3 py-2 border-b border-border-subtle">
+        <h3 className="text-xs font-medium text-text-muted uppercase truncate" title={rootPath}>
+          {rootName}
         </h3>
       </div>
 
       <div className="flex-1 overflow-auto min-w-0">
         {isLoading ? (
-          <div className="p-4 text-muted text-sm">Loading...</div>
+          <div className="p-4 text-text-muted text-sm">Loading...</div>
         ) : files.length === 0 ? (
-          <div className="p-4 text-muted text-sm">Empty folder</div>
+          <div className="p-4 text-text-muted text-sm">Empty folder</div>
         ) : (
           files.map(node => renderNode(node))
         )}

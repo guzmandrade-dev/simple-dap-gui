@@ -27,6 +27,77 @@ const DEFAULT_LAUNCH_JSON = {
   ],
 };
 
+function IconFolder({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 3h4l2 2h6v8H2V3z" />
+    </svg>
+  );
+}
+
+function IconPlay({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M4 2l10 6-10 6V2z" />
+    </svg>
+  );
+}
+
+function IconStop({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+      <rect x="3" y="3" width="10" height="10" />
+    </svg>
+  );
+}
+
+function IconPause({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+      <rect x="3" y="2" width="4" height="12" />
+      <rect x="9" y="2" width="4" height="12" />
+    </svg>
+  );
+}
+
+function IconStepOver({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 8h7" />
+      <path d="M8 5l3 3-3 3" />
+      <path d="M3 4v8" />
+    </svg>
+  );
+}
+
+function IconStepInto({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 2v9" />
+      <path d="M5 8l3 3 3-3" />
+      <path d="M3 14h10" />
+    </svg>
+  );
+}
+
+function IconStepOut({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 14V5" />
+      <path d="M5 6l3-3 3 3" />
+      <path d="M3 2h10" />
+    </svg>
+  );
+}
+
+function IconPlus({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 2v12M2 8h12" />
+    </svg>
+  );
+}
+
 export function Toolbar() {
   const { isSessionActive, isPaused, startSession, stopSession, continue: continueExecution, stepOver, stepInto, stepOut, pause } = useDebugStore();
   const { selectedConfig, configs, selectConfig, loadConfigs } = useConfigStore();
@@ -56,7 +127,7 @@ export function Toolbar() {
 
     const vscodeDir = await window.electronAPI?.pathJoin(root, '.vscode');
     const configPath = await window.electronAPI?.pathJoin(vscodeDir, 'launch.json');
-    
+
     const exists = await window.electronAPI?.fileExists(configPath);
     if (exists) {
       const overwrite = confirm('launch.json already exists. Overwrite?');
@@ -65,7 +136,9 @@ export function Toolbar() {
 
     try {
       await window.electronAPI?.createDirectory?.(vscodeDir);
-    } catch (e) {}
+    } catch (e) {
+      // Directory may already exist
+    }
 
     const content = JSON.stringify(DEFAULT_LAUNCH_JSON, null, 2);
     try {
@@ -78,87 +151,68 @@ export function Toolbar() {
   };
 
   return (
-    <div className="h-12 bg-panel border-b border-border flex items-center px-4 gap-4">
-      <div className="flex gap-2">
-        <button 
-          onClick={() => window.electronAPI?.openFolder()}
-          className="flex items-center gap-2 px-3 py-1.5 bg-elevated text-sm font-medium"
-          title="Open Folder (Ctrl+O)"
+    <div className="h-10 bg-bg-secondary border-b border-border-subtle flex items-center px-3 gap-3">
+      <button
+        onClick={() => window.electronAPI?.openFolder()}
+        className="btn btn-outline"
+        title="Open Folder (Ctrl+O)"
+      >
+        <IconFolder />
+        <span>Open</span>
+      </button>
+
+      <div className="w-px h-5 bg-border" />
+
+      {!isSessionActive ? (
+        <button
+          onClick={handleStart}
+          disabled={!selectedConfig}
+          className="btn btn-primary"
+          title="Start Debugging (F5)"
         >
-          <span>📁</span>
-          <span>Open</span>
+          <IconPlay />
+          <span>Debug</span>
         </button>
-        
-        <div className="w-px h-6 bg-border mx-1"></div>
-        
-        {!isSessionActive ? (
-          <button 
-            onClick={handleStart}
-            disabled={!selectedConfig}
-            className="flex items-center gap-2 px-3 py-1.5 bg-success text-success-text disabled:bg-elevated disabled:text-text disabled:cursor-not-allowed text-sm font-medium"
-          >
-            <span>▶</span>
-            <span>Debug</span>
+      ) : (
+        <>
+          <button onClick={stopSession} className="btn btn-danger" title="Stop (Shift+F5)">
+            <IconStop />
+            <span>Stop</span>
           </button>
-        ) : (
-          <>
-            <button 
-              onClick={stopSession}
-              className="flex items-center gap-2 px-3 py-1.5 bg-danger text-danger-text text-sm font-medium"
-            >
-              <span>⏹</span>
-              <span>Stop</span>
-            </button>
-            
-            {isPaused ? (
-              <>
-                <button 
-                  onClick={continueExecution} 
-                  className="flex items-center gap-2 px-3 py-1.5 bg-success text-success-text text-sm font-medium"
-                >
-                  <span>▶</span>
-                  <span>Continue</span>
-                </button>
-                <button 
-                  onClick={stepOver} 
-                  className="flex items-center gap-2 px-3 py-1.5 bg-elevated text-sm font-medium"
-                >
-                  <span>⤷</span>
-                  <span>Step Over</span>
-                </button>
-                <button 
-                  onClick={stepInto} 
-                  className="flex items-center gap-2 px-3 py-1.5 bg-elevated text-sm font-medium"
-                >
-                  <span>⤵</span>
-                  <span>Step Into</span>
-                </button>
-                <button 
-                  onClick={stepOut} 
-                  className="flex items-center gap-2 px-3 py-1.5 bg-elevated text-sm font-medium"
-                >
-                  <span>⤴</span>
-                  <span>Step Out</span>
-                </button>
-              </>
-            ) : (
-              <button 
-                onClick={pause} 
-                className="flex items-center gap-2 px-3 py-1.5 bg-warning text-warning-text text-sm font-medium"
-              >
-                <span>⏸</span>
-                <span>Pause</span>
+
+          {isPaused ? (
+            <>
+              <button onClick={continueExecution} className="btn btn-primary" title="Continue (F5)">
+                <IconPlay />
+                <span>Continue</span>
               </button>
-            )}
-          </>
-        )}
-      </div>
-      
-      <div className="flex-1 flex items-center gap-2">
+              <button onClick={stepOver} className="btn btn-ghost" title="Step Over (F10)">
+                <IconStepOver />
+                <span>Step Over</span>
+              </button>
+              <button onClick={stepInto} className="btn btn-ghost" title="Step Into (F11)">
+                <IconStepInto />
+                <span>Step Into</span>
+              </button>
+              <button onClick={stepOut} className="btn btn-ghost" title="Step Out (Shift+F11)">
+                <IconStepOut />
+                <span>Step Out</span>
+              </button>
+            </>
+          ) : (
+            <button onClick={pause} className="btn btn-ghost" title="Pause">
+              <IconPause />
+              <span>Pause</span>
+            </button>
+          )}
+        </>
+      )}
+
+      <div className="flex-1 flex items-center gap-2 min-w-0">
         <select
           value={selectedConfig?.name || ''}
           onChange={(e) => selectConfig(e.target.value)}
-          className="flex-1 max-w-md px-3 py-1.5 bg-elevated border border-border text-sm focus:outline-none focus:border-accent"
+          className="flex-1 max-w-md"
         >
           <option value="">Select configuration...</option>
           {configs.map((config) => (
@@ -167,33 +221,36 @@ export function Toolbar() {
             </option>
           ))}
         </select>
-        
+
         {configs.length === 0 && (
           <button
             onClick={createLaunchJson}
-            className="px-3 py-1.5 bg-accent text-accent-text text-sm font-medium whitespace-nowrap"
+            className="btn btn-primary whitespace-nowrap"
           >
-            + Create launch.json
+            <IconPlus />
+            <span>Create launch.json</span>
           </button>
         )}
       </div>
-      
-      <div className="text-sm text-secondary">
-        {isSessionActive && (isPaused ? '⏸ Paused' : '▶ Running')}
-      </div>
+
+      {isSessionActive && (
+        <div className={`text-xs font-medium ${isPaused ? 'text-warning' : 'text-success'}`}>
+          {isPaused ? 'Paused' : 'Running'}
+        </div>
+      )}
 
       {/* No Config Modal */}
       {showNoConfigModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-panel border border-border rounded-lg shadow-xl p-6 max-w-sm w-full mx-4">
-            <h3 className="text-lg font-semibold text-text mb-2">No Debug Configuration</h3>
-            <p className="text-sm text-secondary mb-4">
-              You need a <code className="bg-elevated px-1 rounded">.vscode/launch.json</code> file to start debugging. Open a folder that contains one, or create it now.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-bg-secondary border border-border shadow-xl p-5 max-w-sm w-full mx-4">
+            <h3 className="text-base font-medium text-text mb-2">No Debug Configuration</h3>
+            <p className="text-sm text-text-secondary mb-4">
+              You need a <code className="bg-bg-tertiary px-1 rounded">.vscode/launch.json</code> file to start debugging. Open a folder that contains one, or create it now.
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setShowNoConfigModal(false)}
-                className="px-4 py-2 text-sm text-secondary hover:text-text"
+                className="btn btn-ghost"
               >
                 Cancel
               </button>
@@ -202,7 +259,7 @@ export function Toolbar() {
                   setShowNoConfigModal(false);
                   createLaunchJson();
                 }}
-                className="px-4 py-2 text-sm bg-accent text-accent-text rounded hover:opacity-90"
+                className="btn btn-primary"
               >
                 Create launch.json
               </button>
@@ -210,30 +267,28 @@ export function Toolbar() {
           </div>
         </div>
       )}
+
       {/* Error Modal */}
       {errorMessage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-panel border border-border rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-danger mb-2">Debug Session Failed</h3>
-            <p className="text-sm text-secondary mb-4 whitespace-pre-wrap">{errorMessage}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-bg-secondary border border-border shadow-xl p-5 max-w-md w-full mx-4">
+            <h3 className="text-base font-medium text-danger mb-2">Debug Session Failed</h3>
+            <p className="text-sm text-text-secondary mb-4 whitespace-pre-wrap">{errorMessage}</p>
             {errorMessage.includes('Adapter not found') && (
-              <p className="text-sm text-secondary mb-4">
-                Install the PHP Debug adapter from the <strong>Adapters</strong> panel, or download it from the
-                {' '}
+              <p className="text-sm text-text-secondary mb-4">
+                Install the PHP Debug adapter from the <strong>Adapters</strong> panel, or download it from the{' '}
                 <a
                   href="https://github.com/xdebug/vscode-php-debug/releases"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-accent hover:underline"
                 >
-                  releases page</a>.
+                  releases page
+                </a>.
               </p>
             )}
             <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setErrorMessage(null)}
-                className="px-4 py-2 text-sm bg-accent text-accent-text rounded hover:opacity-90"
-              >
+              <button onClick={() => setErrorMessage(null)} className="btn btn-primary">
                 OK
               </button>
             </div>

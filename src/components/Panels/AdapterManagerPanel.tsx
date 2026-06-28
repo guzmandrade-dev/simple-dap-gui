@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
 import { AdapterInfo } from '../../utils/adapterManager';
 
+function IconRefresh({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 8a6 6 0 0110.24-4.24M14 8a6 6 0 01-10.24 4.24" />
+      <path d="M14 4v4h-4M2 12v-4h4" />
+    </svg>
+  );
+}
+
 export function AdapterManagerPanel() {
   const [adapters, setAdapters] = useState<AdapterInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -33,8 +42,8 @@ export function AdapterManagerPanel() {
     try {
       const installed = await window.electronAPI?.installAdapter(adapterId);
       if (installed) {
-        setAdapters(prev =>
-          prev.map(a => a.id === adapterId ? { ...a, installed: true, installPath: installed.installPath } : a)
+        setAdapters((prev) =>
+          prev.map((a) => (a.id === adapterId ? { ...a, installed: true, installPath: installed.installPath } : a))
         );
       }
     } catch (err) {
@@ -47,8 +56,8 @@ export function AdapterManagerPanel() {
   const handleUninstall = async (adapterId: string) => {
     try {
       await window.electronAPI?.uninstallAdapter(adapterId);
-      setAdapters(prev =>
-        prev.map(a => a.id === adapterId ? { ...a, installed: false, installPath: undefined } : a)
+      setAdapters((prev) =>
+        prev.map((a) => (a.id === adapterId ? { ...a, installed: false, installPath: undefined } : a))
       );
     } catch (err) {
       setError(`Failed to uninstall adapter: ${err instanceof Error ? err.message : String(err)}`);
@@ -61,8 +70,8 @@ export function AdapterManagerPanel() {
     try {
       const installed = await window.electronAPI?.installCustomAdapter();
       if (installed) {
-        setAdapters(prev => {
-          const idx = prev.findIndex(a => a.id === installed.id);
+        setAdapters((prev) => {
+          const idx = prev.findIndex((a) => a.id === installed.id);
           if (idx >= 0) {
             const next = [...prev];
             next[idx] = installed;
@@ -79,89 +88,67 @@ export function AdapterManagerPanel() {
   };
 
   if (isLoading) {
-    return (
-      <div className="p-4 text-secondary">
-        <div>Loading adapters...</div>
-      </div>
-    );
+    return <div className="p-4 text-text-secondary text-sm">Loading adapters...</div>;
   }
 
   return (
-    <div className="p-2">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-bold text-secondary uppercase">Debug Adapters</h3>
+    <div className="py-2">
+      <div className="flex items-center justify-between mb-2 px-3">
+        <h3 className="text-xs font-medium text-text-muted uppercase">Debug Adapters</h3>
         <div className="flex gap-2 items-center">
           <button
             onClick={handleInstallCustom}
             disabled={installing === 'custom'}
-            className="text-xs px-2 py-1 border border-accent text-accent disabled:opacity-50"
+            className="btn btn-ghost text-xs"
             title="Install from a .vsix file"
           >
             {installing === 'custom' ? 'Installing...' : 'Install from .vsix'}
           </button>
-          <button
-            onClick={loadAdapters}
-            className="text-xs text-accent"
-            title="Refresh"
-          >
-            ↻ Refresh
+          <button onClick={loadAdapters} className="btn btn-ghost p-1.5" title="Refresh" aria-label="Refresh">
+            <IconRefresh />
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="mb-3 p-2 border border-danger text-xs text-danger">
-          {error}
-          <button
-            onClick={() => setError(null)}
-            className="ml-2 text-danger"
-          >
+        <div className="mb-2 p-2 mx-3 border border-danger text-xs text-danger flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-danger hover:text-text">
             ×
           </button>
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="divide-y divide-border-subtle">
         {adapters.map((adapter) => (
           <div
             key={adapter.id}
-            className={`p-2 border ${
-              adapter.installed
-                ? 'border-success bg-panel'
-                : 'border-border bg-panel'
-            }`}
+            className={`px-3 py-2 ${adapter.installed ? 'bg-bg-secondary/50' : ''}`}
           >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="font-medium text-sm text-text">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-text truncate">
                   {adapter.name}
-                  {adapter.isCustom && (
-                    <span className="ml-1 text-xs text-accent">(custom)</span>
-                  )}
+                  {adapter.isCustom && <span className="ml-1 text-xs text-accent">(custom)</span>}
                 </div>
-                <div className="text-xs text-muted">
+                <div className="text-xs text-text-muted">
                   {adapter.publisher} • v{adapter.version}
                 </div>
-                <div className="text-xs text-secondary mt-1">
-                  {adapter.description}
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  {adapter.supportedLanguages.map(lang => (
-                    <span
-                      key={lang}
-                      className="px-1.5 py-0.5 bg-elevated text-xs text-secondary"
-                    >
+                <div className="text-xs text-text-secondary mt-1">{adapter.description}</div>
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  {adapter.supportedLanguages.map((lang) => (
+                    <span key={lang} className="px-1.5 py-0.5 bg-bg-tertiary text-[10px] text-text-secondary rounded">
                       {lang}
                     </span>
                   ))}
                 </div>
               </div>
 
-              <div className="ml-2">
+              <div className="shrink-0">
                 {adapter.installed ? (
                   <button
                     onClick={() => handleUninstall(adapter.id)}
-                    className="px-2 py-1 bg-danger text-danger-text text-xs"
+                    className="btn btn-danger text-xs"
                     disabled={installing === adapter.id}
                   >
                     {installing === adapter.id ? '...' : 'Uninstall'}
@@ -169,7 +156,7 @@ export function AdapterManagerPanel() {
                 ) : (
                   <button
                     onClick={() => handleInstall(adapter.id)}
-                    className="px-2 py-1 bg-accent text-accent-text text-xs"
+                    className="btn btn-primary text-xs"
                     disabled={installing === adapter.id}
                   >
                     {installing === adapter.id ? 'Installing...' : 'Install'}
@@ -179,9 +166,8 @@ export function AdapterManagerPanel() {
             </div>
 
             {adapter.installed && (
-              <div className="mt-2 text-xs text-success flex items-center gap-1">
-                <span>✓</span>
-                <span>Installed</span>
+              <div className="mt-1.5 text-xs text-success flex items-center gap-1">
+                Installed
               </div>
             )}
           </div>
@@ -189,9 +175,7 @@ export function AdapterManagerPanel() {
       </div>
 
       {adapters.length === 0 && (
-        <div className="text-center py-4 text-muted text-sm">
-          No adapters available
-        </div>
+        <div className="text-center py-4 text-text-muted text-sm">No adapters available</div>
       )}
     </div>
   );

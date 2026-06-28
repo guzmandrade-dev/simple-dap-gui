@@ -77,7 +77,7 @@ export function ResizablePanel({
         className={`
           absolute top-0 right-0 h-full cursor-col-resize z-10
           flex items-center justify-center
-          ${isResizing ? 'bg-accent/20' : 'bg-transparent hover:bg-border/50'}
+          ${isResizing ? 'bg-accent/20' : 'bg-transparent hover:bg-border-subtle/60'}
         `}
         style={{ width: '6px', transform: 'translateX(50%)' }}
         title="Drag to resize"
@@ -85,7 +85,7 @@ export function ResizablePanel({
         <div
           className={`
             w-px h-8 rounded-full transition-colors
-            ${isResizing ? 'bg-accent' : 'bg-border'}
+            ${isResizing ? 'bg-accent' : 'bg-border-subtle'}
           `}
         />
       </div>
