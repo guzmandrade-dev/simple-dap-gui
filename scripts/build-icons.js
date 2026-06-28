@@ -35,7 +35,7 @@ async function build() {
     throw new Error(`Logo SVG not found: ${LOGO_SVG}`);
   }
   await generatePngs();
-  await copyBestIcon('icon.png', 256);
+  await copyBestIcon('icon.png', 512);
 }
 
 build().catch((err) => {
