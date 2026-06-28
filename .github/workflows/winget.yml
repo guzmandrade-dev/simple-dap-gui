@@ -1,0 +1,16 @@
+name: Submit to Winget
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  winget:
+    runs-on: windows-latest
+    steps:
+      - name: Submit package to Winget
+        uses: vedantmgoyal9/winget-releaser@main
+        with:
+          identifier: guzmandrade-dev.simple-dap-gui
+          installers-regex: '\.exe$|\.msi$'
+          token: ${{ secrets.WINGET_TOKEN }}

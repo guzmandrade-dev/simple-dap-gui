@@ -1,8 +1,8 @@
 # simple-dap-gui - Xdebug Debugger GUI
 
-[![Build](https://github.com/guzmandrade-dev/dap-gui/actions/workflows/build.yml/badge.svg)](https://github.com/guzmandrade-dev/dap-gui/actions/workflows/build.yml)
+[![Build](https://github.com/guzmandrade-dev/simple-dap-gui/actions/workflows/build.yml/badge.svg)](https://github.com/guzmandrade-dev/simple-dap-gui/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![GitHub release](https://img.shields.io/github/v/release/guzmandrade-dev/dap-gui)](https://github.com/guzmandrade-dev/dap-gui/releases)
+[![GitHub release](https://img.shields.io/github/v/release/guzmandrade-dev/simple-dap-gui)](https://github.com/guzmandrade-dev/simple-dap-gui/releases)
 
 A standalone DAP (Debug Adapter Protocol) client GUI application built with Electron, React, TypeScript, and PrismJS. Primarily designed for **PHP debugging with Xdebug**.
 
@@ -70,6 +70,21 @@ dap-gui/
 ```
 
 ## Installation
+
+### Package managers (recommended)
+
+Once published, install the app through your platform's package manager:
+
+- **Windows (Winget)**: `winget install guzmandrade-dev.simple-dap-gui`
+- **macOS (Homebrew)**: `brew install --cask simple-dap-gui`
+- **Linux (Flatpak/Flathub)**: `flatpak install flathub com.guzmandrade.SimpleDapGui`
+
+Releases are published automatically from GitHub Releases via:
+- [`.github/workflows/winget.yml`](.github/workflows/winget.yml)
+- [`.github/workflows/homebrew-cask.yml`](.github/workflows/homebrew-cask.yml)
+- `distrib/flathub/com.guzmandrade.SimpleDapGui.yml` (submit to [flathub/flathub](https://github.com/flathub/flathub))
+
+### From source
 
 ```bash
 # Install dependencies

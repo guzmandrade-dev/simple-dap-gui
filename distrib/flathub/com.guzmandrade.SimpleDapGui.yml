@@ -1,0 +1,50 @@
+id: com.guzmandrade.SimpleDapGui
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '23.08'
+command: simple-dap-gui
+finish-args:
+  - --share=ipc
+  - --socket=x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --share=network
+  - --device=dri
+  - --filesystem=home
+  - --talk-name=org.freedesktop.Notifications
+
+modules:
+  - name: simple-dap-gui
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 simple-dap-gui /app/bin/simple-dap-gui
+      - install -Dm644 com.guzmandrade.SimpleDapGui.metainfo.xml /app/share/metainfo/com.guzmandrade.SimpleDapGui.metainfo.xml
+      - install -Dm644 assets/icon.png /app/share/icons/hicolor/512x512/apps/com.guzmandrade.SimpleDapGui.png
+      - |
+        mkdir -p /app/share/applications
+        cat > /app/share/applications/com.guzmandrade.SimpleDapGui.desktop <<EOF
+        [Desktop Entry]
+        Name=simple-dap-gui
+        Comment=A standalone DAP client GUI
+        Exec=simple-dap-gui
+        Icon=com.guzmandrade.SimpleDapGui
+        Type=Application
+        Categories=Development;Debugger;
+        Terminal=false
+        EOF
+    sources:
+      - type: archive
+        url: https://github.com/guzmandrade-dev/simple-dap-gui/releases/download/v0.4.1/simple-dap-gui-0.4.1.tar.gz
+        sha256: b2c36b7e8899688b1ad05bfa37159c70bae1eae9e25fd3c4375dd4767b582d1b
+        x-checker-data:
+          type: json
+          url: https://api.github.com/repos/guzmandrade-dev/simple-dap-gui/releases/latest
+          version-query: .tag_name | sub("^v"; "")
+          url-query: |
+            .assets[] | select(.name=="simple-dap-gui-" + $version + ".tar.gz") | .browser_download_url
+      - type: file
+        path: assets/icon.png
+      - type: file
+        path: distrib/flathub/com.guzmandrade.SimpleDapGui.metainfo.xml

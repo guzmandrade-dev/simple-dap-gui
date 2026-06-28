@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.guzmandrade.SimpleDapGui</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>simple-dap-gui</name>
+  <summary>A standalone DAP client GUI for debugging</summary>
+  <description>
+    <p>
+      simple-dap-gui is a lightweight, cross-platform desktop debugger for DAP
+      (Debug Adapter Protocol) targets such as Xdebug, Python, and Node.js.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.guzmandrade.SimpleDapGui.desktop</launchable>
+  <url type="homepage">https://github.com/guzmandrade-dev/simple-dap-gui</url>
+  <url type="bugtracker">https://github.com/guzmandrade-dev/simple-dap-gui/issues</url>
+  <developer_name>guzmandrade-dev</developer_name>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.4.1" date="2026-06-28" />
+  </releases>
+</component>

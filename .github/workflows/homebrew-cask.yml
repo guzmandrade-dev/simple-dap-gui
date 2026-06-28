@@ -1,0 +1,17 @@
+name: Bump Homebrew Cask
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  homebrew:
+    runs-on: macos-latest
+    steps:
+      - name: Bump Homebrew Cask
+        uses: dawidd6/action-homebrew-bump-cask@v3
+        with:
+          token: ${{ secrets.HOMEBREW_TOKEN }}
+          cask: simple-dap-gui
+          tap: Homebrew/homebrew-cask
+          force: false
