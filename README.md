@@ -79,6 +79,8 @@ Once published, install the app through your platform's package manager:
 - **macOS (Homebrew)**: `brew install --cask simple-dap-gui`
 - **Linux (Flatpak/Flathub)**: `flatpak install flathub com.guzmandrade.SimpleDapGui`
 
+> **Note:** Installers are currently **not code-signed**. On Windows you may see a Microsoft Defender SmartScreen prompt the first time you run the app; click **More info** → **Run anyway** to proceed.
+
 Releases are published automatically from GitHub Releases via:
 - [`.github/workflows/winget.yml`](.github/workflows/winget.yml)
 - [`.github/workflows/homebrew-cask.yml`](.github/workflows/homebrew-cask.yml)
