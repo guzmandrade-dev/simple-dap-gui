@@ -34,6 +34,7 @@ export interface ElectronAPI {
   getAppSettings: () => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean }>;
   setAppSettings: (settings: Partial<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean }>) => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean }>;
   onSettingsChanged: (callback: (settings: { theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean }) => void) => () => void;
+  getAppVersion: () => Promise<string>;
 
   // Window controls
   windowMinimize: () => Promise<void>;

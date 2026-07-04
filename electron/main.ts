@@ -1,15 +1,50 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { watch as fsWatch, FSWatcher, existsSync } from 'fs';
+import { watch as fsWatch, FSWatcher, existsSync, statSync } from 'fs';
 import { ADAPTER_CATALOG, AdapterInfo, InstalledAdapterManifest } from '../src/utils/adapterManager';
 import { DebugSession } from '../src/dap/session';
 import { LaunchConfiguration } from '../src/dap/types';
 import { DebugProtocol } from '@vscode/debugprotocol';
+import * as packageJson from '../package.json';
 
 // Store reference to main window
 let mainWindow: BrowserWindow | null = null;
 let currentProjectPath: string | null = null;
+let pendingFolderFromSecondInstance: string | null = null;
+
+function getInitialFolderFromArgs(argv: string[]): string | null {
+  // Skip executable and app path entries; take the last positional argument.
+  const positional: string[] = [];
+  for (let i = 1; i < argv.length; i++) {
+    const arg = argv[i];
+    if (!arg) continue;
+    // Ignore Electron/Chromium flags and the app path.
+    if (arg.startsWith('--') || arg.startsWith('-') || arg === process.execPath || arg === app.getAppPath()) continue;
+    positional.push(arg);
+  }
+
+  if (positional.length === 0) return null;
+
+  const candidate = positional[positional.length - 1];
+  const resolved = path.resolve(candidate);
+  try {
+    const stat = statSync(resolved);
+    if (stat.isDirectory()) {
+      return resolved;
+    }
+  } catch {
+    // Not a valid directory; ignore.
+  }
+  return null;
+}
+
+async function setWorkspaceRoot(folderPath: string): Promise<void> {
+  currentProjectPath = folderPath;
+  if (mainWindow) {
+    mainWindow.webContents.send('folder-opened', folderPath);
+  }
+}
 
 // Adapters storage directory
 const getAdaptersDir = () => path.join(app.getPath('userData'), 'adapters');
@@ -302,26 +337,57 @@ async function openFolder() {
 
   if (!result.canceled && result.filePaths.length > 0) {
     const folderPath = result.filePaths[0];
-    currentProjectPath = folderPath;
-
-    // Notify renderer process
-    mainWindow.webContents.send('folder-opened', folderPath);
-
+    await setWorkspaceRoot(folderPath);
     console.log('Opened folder:', folderPath);
   }
 }
 
 // App event handlers
-app.whenReady().then(async () => {
-  await initSettings();
-  createWindow();
+const gotTheLock = app.requestSingleInstanceLock();
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const folder = getInitialFolderFromArgs(argv);
+    if (folder) {
+      pendingFolderFromSecondInstance = folder;
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+        setWorkspaceRoot(folder);
+        pendingFolderFromSecondInstance = null;
+      }
+    } else if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
     }
   });
-});
+
+  app.whenReady().then(async () => {
+    await initSettings();
+    createWindow();
+
+    const initialFolder = getInitialFolderFromArgs(process.argv);
+    if (initialFolder) {
+      await setWorkspaceRoot(initialFolder);
+    }
+
+    // If a second instance sent a folder while the window was still loading, apply it now.
+    mainWindow?.once('ready-to-show', async () => {
+      if (pendingFolderFromSecondInstance) {
+        await setWorkspaceRoot(pendingFolderFromSecondInstance);
+        pendingFolderFromSecondInstance = null;
+      }
+    });
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  });
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -614,6 +680,10 @@ ipcMain.handle('set-workspace-root', (_event, root: string) => {
   // Notify renderer that workspace changed
   mainWindow?.webContents.send('workspace-changed', root);
   return root;
+});
+
+ipcMain.handle('get-app-version', () => {
+  return packageJson.version;
 });
 
 ipcMain.handle('get-app-settings', async () => {

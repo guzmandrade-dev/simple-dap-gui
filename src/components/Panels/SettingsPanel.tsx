@@ -45,11 +45,15 @@ export function SettingsPanel() {
   const [editorMode, setEditorMode] = useState<EditorPresetKey>('code');
   const [customCommand, setCustomCommand] = useState('');
   const [saved, setSaved] = useState(false);
+  const [appVersion, setAppVersion] = useState('');
   const { theme, setTheme } = useConfigStore();
 
   useEffect(() => {
     const load = async () => {
       try {
+        const version = await window.electronAPI?.getAppVersion();
+        if (version) setAppVersion(version);
+
         const appSettings = await window.electronAPI?.getAppSettings();
         if (appSettings) {
           const next = {
@@ -239,8 +243,18 @@ export function SettingsPanel() {
       <section className="border-t border-border-subtle pt-4">
         <h3 className="text-sm font-medium text-text mb-1">About</h3>
         <p className="text-xs text-text-muted">
-          simple-dap-gui v0.4.1<br />
+          simple-dap-gui v{appVersion || '0.4.2'}<br />
           A DAP Debugger GUI built with Electron
+        </p>
+        <p className="text-xs text-text-muted mt-1">
+          <a
+            href="https://github.com/guzmandrade-dev/simple-dap-gui/releases"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent hover:underline"
+          >
+            Releases
+          </a>
         </p>
       </section>
     </div>
