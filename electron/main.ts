@@ -364,6 +364,23 @@ if (!gotTheLock) {
     }
   });
 
+  app.on('open-file', (event, filePath) => {
+    event.preventDefault();
+    try {
+      const resolved = path.resolve(filePath);
+      const stat = statSync(resolved);
+      if (stat.isDirectory()) {
+        if (mainWindow) {
+          setWorkspaceRoot(resolved);
+        } else {
+          pendingFolderFromSecondInstance = resolved;
+        }
+      }
+    } catch {
+      // Not a valid directory; ignore.
+    }
+  });
+
   app.whenReady().then(async () => {
     await initSettings();
     createWindow();

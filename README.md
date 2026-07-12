@@ -81,6 +81,52 @@ Once published, install the app through your platform's package manager:
 
 > **Note:** Installers are currently **not code-signed**. On Windows you may see a Microsoft Defender SmartScreen prompt the first time you run the app; click **More info** → **Run anyway** to proceed.
 
+### macOS: Running the unsigned app
+
+Because the app is not currently code-signed or notarized, macOS Gatekeeper may show an error such as **“simple-dap-gui is damaged and can’t be opened”** after downloading a release.
+
+The app is not actually damaged; macOS has added a quarantine flag to the downloaded file and is refusing to run unsigned software.
+
+To run it, use one of the following methods:
+
+**Option 1 — Remove the quarantine flag (recommended)**
+
+Open Terminal and run:
+
+```bash
+xattr -rd com.apple.quarantine /Applications/simple-dap-gui.app
+```
+
+Then launch the app normally.
+
+**Option 2 — Open via System Settings**
+
+1. Try to open the app once (Gatekeeper will block it).
+2. Open **System Settings > Privacy & Security**.
+3. Scroll down and click **Open Anyway** next to the `simple-dap-gui` message.
+
+### Launch from the command line (macOS)
+
+The app accepts a project folder as its first positional argument:
+
+```bash
+/Applications/simple-dap-gui.app/Contents/MacOS/simple-dap-gui /path/to/your/project
+```
+
+To make `simple-dap-gui` available as a regular shell command, create a symlink:
+
+```bash
+ln -s /Applications/simple-dap-gui.app/Contents/MacOS/simple-dap-gui /usr/local/bin/simple-dap-gui
+```
+
+Then you can open projects with:
+
+```bash
+simple-dap-gui /path/to/your/project
+```
+
+> If you install the app somewhere other than `/Applications`, adjust the path in the symlink accordingly.
+
 Releases are published automatically from GitHub Releases via:
 - [`.github/workflows/winget.yml`](.github/workflows/winget.yml)
 - [`.github/workflows/homebrew-cask.yml`](.github/workflows/homebrew-cask.yml)
