@@ -6,7 +6,8 @@ export async function fetchFileContent(path: string): Promise<string> {
   try {
     return await window.electronAPI.readFile(path);
   } catch (err) {
-    throw new Error(`Failed to load file: ${path}`);
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to load file: ${path}\n${message}`);
   }
 }
 

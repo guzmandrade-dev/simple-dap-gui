@@ -136,7 +136,7 @@ app.on('quit', () => {
 class DebugSessionManager {
   private session: DebugSession | null = null;
 
-  async start(config: LaunchConfiguration, initialBreakpoints?: Map<string, number[]>): Promise<void> {
+  async start(config: LaunchConfiguration, initialBreakpoints?: Map<string, number[]>, initialExceptionFilters?: string[]): Promise<void> {
     const workspaceRoot = currentProjectPath || process.cwd();
     this.session = new DebugSession(config, workspaceRoot);
 
@@ -145,6 +145,10 @@ class DebugSessionManager {
       for (const [filePath, lines] of initialBreakpoints) {
         this.session.setBreakpoints(filePath, lines);
       }
+    }
+
+    if (initialExceptionFilters && initialExceptionFilters.length > 0) {
+      this.session.setExceptionBreakpoints(initialExceptionFilters);
     }
 
     // Get adapter path
@@ -163,6 +167,13 @@ class DebugSessionManager {
   async stop(): Promise<void> {
     if (this.session) {
       await this.session.disconnect();
+      this.session = null;
+    }
+  }
+
+  async detach(): Promise<void> {
+    if (this.session) {
+      await this.session.detach();
       this.session = null;
     }
   }
@@ -189,6 +200,10 @@ class DebugSessionManager {
 
   async setBreakpoints(filePath: string, lines: number[]): Promise<void> {
     await this.session?.setBreakpoints(filePath, lines);
+  }
+
+  async setExceptionBreakpoints(filters: string[]): Promise<void> {
+    await this.session?.setExceptionBreakpoints(filters);
   }
 
   async fetchVariables(variablesReference: number): Promise<DebugProtocol.Variable[]> {
@@ -793,10 +808,10 @@ ipcMain.handle('write-file', async (_event, filePath: string, content: string) =
 
 // Debug Session IPC Handlers
 
-ipcMain.handle('debug-start', async (_event, config: LaunchConfiguration, initialBreakpoints?: [string, number[]][]) => {
+ipcMain.handle('debug-start', async (_event, config: LaunchConfiguration, initialBreakpoints?: [string, number[]][], initialExceptionFilters?: string[]) => {
   try {
     const breakpoints = initialBreakpoints ? new Map(initialBreakpoints) : undefined;
-    await debugManager.start(config, breakpoints);
+    await debugManager.start(config, breakpoints, initialExceptionFilters);
     return { success: true };
   } catch (error) {
     return { success: false, error: String(error) };
@@ -805,6 +820,11 @@ ipcMain.handle('debug-start', async (_event, config: LaunchConfiguration, initia
 
 ipcMain.handle('debug-stop', async () => {
   await debugManager.stop();
+  return { success: true };
+});
+
+ipcMain.handle('debug-detach', async () => {
+  await debugManager.detach();
   return { success: true };
 });
 
@@ -835,6 +855,11 @@ ipcMain.handle('debug-pause', async () => {
 
 ipcMain.handle('debug-set-breakpoints', async (_event, filePath: string, lines: number[]) => {
   await debugManager.setBreakpoints(filePath, lines);
+  return { success: true };
+});
+
+ipcMain.handle('debug-set-exception-breakpoints', async (_event, filters: string[]) => {
+  await debugManager.setExceptionBreakpoints(filters);
   return { success: true };
 });
 

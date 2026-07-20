@@ -84,6 +84,9 @@ interface DebugState {
   breakpoints: Map<string, Set<number>>;
   breakpointVerified: Map<string, Map<number, boolean>>;
 
+  // Exception breakpoints (e.g. Notice, Warning, Error, Exception, Everything)
+  exceptionBreakpoints: Map<string, boolean>;
+
   // Workspace
   workspaceRoot: string;
   recentConfigs: LaunchConfiguration[];
@@ -95,6 +98,7 @@ interface DebugState {
   initialize: () => Promise<void>;
   startSession: (config: LaunchConfiguration) => Promise<void>;
   stopSession: () => Promise<void>;
+  detachSession: () => Promise<void>;
   continue: () => Promise<void>;
   stepOver: () => Promise<void>;
   stepInto: () => Promise<void>;
@@ -122,6 +126,11 @@ interface DebugState {
   toggleBreakpointEnabled: (file: string, line: number) => void;
   isBreakpointEnabled: (file: string, line: number) => boolean;
   reloadBreakpoints: () => Promise<void>;
+
+  // Exception breakpoint management
+  setExceptionBreakpoint: (filter: string, enabled: boolean) => Promise<void>;
+  toggleExceptionBreakpoint: (filter: string) => Promise<void>;
+  isExceptionBreakpointEnabled: (filter: string) => boolean;
 }
 
 export const useDebugStore = create<DebugState>()((set, get) => ({
@@ -138,6 +147,7 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
   currentLine: undefined,
   breakpoints: new Map(),
   breakpointVerified: new Map(),
+  exceptionBreakpoints: new Map(),
   workspaceRoot: '',
   recentConfigs: [],
   watches: [],
@@ -194,7 +204,8 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
         initialBreakpoints.push([file, Array.from(lines)]);
       }
 
-      const result = await window.electronAPI?.debugStart(config as unknown as Record<string, unknown>, initialBreakpoints);
+      const initialExceptionFilters = Array.from(get().exceptionBreakpoints.keys());
+      const result = await window.electronAPI?.debugStart(config as unknown as Record<string, unknown>, initialBreakpoints, initialExceptionFilters);
       
       if (result?.success) {
         set({ 
@@ -348,6 +359,22 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
     });
   },
 
+  detachSession: async () => {
+    await window.electronAPI?.debugDetach();
+    set({
+      isSessionActive: false,
+      isPaused: false,
+      threads: [],
+      stackFrames: [],
+      scopes: [],
+      variables: new Map(),
+      currentThreadId: undefined,
+      currentFrameId: undefined,
+      currentFile: undefined,
+      currentLine: undefined,
+    });
+  },
+
   continue: async () => {
     await window.electronAPI?.debugContinue();
     set({ isPaused: false });
@@ -454,6 +481,30 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
   isBreakpointEnabled: (file: string, line: number) => {
     const fileBPs = get().breakpoints.get(file);
     return fileBPs?.has(line) || false;
+  },
+
+  setExceptionBreakpoint: async (filter: string, enabled: boolean) => {
+    const exceptionBreakpoints = new Map(get().exceptionBreakpoints);
+    if (enabled) {
+      exceptionBreakpoints.set(filter, true);
+    } else {
+      exceptionBreakpoints.delete(filter);
+    }
+    set({ exceptionBreakpoints });
+
+    if (get().isSessionActive) {
+      const filters = Array.from(exceptionBreakpoints.keys());
+      await window.electronAPI?.debugSetExceptionBreakpoints(filters);
+    }
+  },
+
+  toggleExceptionBreakpoint: async (filter: string) => {
+    const enabled = !get().isExceptionBreakpointEnabled(filter);
+    await get().setExceptionBreakpoint(filter, enabled);
+  },
+
+  isExceptionBreakpointEnabled: (filter: string) => {
+    return get().exceptionBreakpoints.has(filter);
   },
 
   reloadBreakpoints: async () => {

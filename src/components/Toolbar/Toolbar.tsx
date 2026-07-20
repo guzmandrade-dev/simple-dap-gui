@@ -60,6 +60,16 @@ function IconPause({ className }: { className?: string }) {
   );
 }
 
+function IconDisconnect({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 4l8 8" />
+      <path d="M5.5 10.5V14m0-3.5L2 7m3.5 3.5L9 14" />
+      <path d="M10.5 5.5V2m0 3.5L14 9m-3.5-3.5L7 2" />
+    </svg>
+  );
+}
+
 function IconStepOver({ className }: { className?: string }) {
   return (
     <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -99,7 +109,7 @@ function IconPlus({ className }: { className?: string }) {
 }
 
 export function Toolbar() {
-  const { isSessionActive, isPaused, startSession, stopSession, continue: continueExecution, stepOver, stepInto, stepOut, pause } = useDebugStore();
+  const { isSessionActive, isPaused, startSession, stopSession, detachSession, continue: continueExecution, stepOver, stepInto, stepOut, pause } = useDebugStore();
   const { selectedConfig, configs, selectConfig, loadConfigs } = useConfigStore();
   const [showNoConfigModal, setShowNoConfigModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -178,6 +188,15 @@ export function Toolbar() {
           <button onClick={stopSession} className="btn btn-danger" title="Stop (Shift+F5)">
             <IconStop />
             <span>Stop</span>
+          </button>
+
+          <button
+            onClick={detachSession}
+            className="btn btn-warning"
+            title="Disconnect (keep process running)"
+          >
+            <IconDisconnect />
+            <span>Disconnect</span>
           </button>
 
           {isPaused ? (

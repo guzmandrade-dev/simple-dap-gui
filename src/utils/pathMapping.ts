@@ -1,5 +1,12 @@
 // Path mapping utilities for converting between server and local paths
 
+function getPathSeparator(): string {
+  if (typeof process !== 'undefined' && process.platform) {
+    return process.platform === 'win32' ? '\\' : '/';
+  }
+  return '/';
+}
+
 export interface VariableContext {
   userHome: string;
   workspaceFolder: string;
@@ -7,13 +14,13 @@ export interface VariableContext {
   pathSeparator: string;
 }
 
-export function getDefaultVariableContext(workspaceRoot: string): VariableContext {
+export function getDefaultVariableContext(workspaceRoot: string, userHome?: string): VariableContext {
   const workspaceFolder = workspaceRoot || (typeof process !== 'undefined' ? process.cwd() : '/');
   return {
-    userHome: (typeof process !== 'undefined' ? (process.env.HOME || process.env.USERPROFILE || '') : '/home/user'),
+    userHome: userHome ?? (typeof process !== 'undefined' ? (process.env.HOME || process.env.USERPROFILE || '') : ''),
     workspaceFolder,
     workspaceFolderBasename: workspaceFolder.split(/[\\/]/).filter(Boolean).pop() || '',
-    pathSeparator: (typeof process !== 'undefined' ? require('path').sep : '/'),
+    pathSeparator: getPathSeparator(),
   };
 }
 
@@ -28,9 +35,10 @@ export function resolveVariables(value: string, context: VariableContext): strin
 export function resolvePathMappings(
   serverPath: string,
   mappings: Record<string, string>,
-  workspaceRoot: string
+  workspaceRoot: string,
+  userHome?: string
 ): string {
-  const context = getDefaultVariableContext(workspaceRoot);
+  const context = getDefaultVariableContext(workspaceRoot, userHome);
   for (const [serverPrefix, localPrefix] of Object.entries(mappings)) {
     const resolvedServerPrefix = resolveVariables(serverPrefix, context);
     const resolvedLocal = resolveVariables(localPrefix, context);
@@ -44,9 +52,10 @@ export function resolvePathMappings(
 export function resolveLocalToServerPath(
   localPath: string,
   mappings: Record<string, string>,
-  workspaceRoot: string
+  workspaceRoot: string,
+  userHome?: string
 ): string {
-  const context = getDefaultVariableContext(workspaceRoot);
+  const context = getDefaultVariableContext(workspaceRoot, userHome);
   for (const [serverPrefix, localPrefix] of Object.entries(mappings)) {
     const resolvedServerPrefix = resolveVariables(serverPrefix, context);
     const resolvedLocal = resolveVariables(localPrefix, context);

@@ -10,7 +10,10 @@ A standalone DAP (Debug Adapter Protocol) client GUI application built with Elec
 
 - **Xdebug / PHP Focus**: First-class support for PHP debugging via the `vscode-php-debug` adapter
 - **PrismJS Code Viewer**: Lightweight, read-only code viewer with syntax highlighting and breakpoint gutter support
-- **Path Mapping**: Full support for remote debugging with `${workspaceFolder}` resolution in path mappings
+- **Path Mapping**: Full support for remote debugging with `${workspaceFolder}`, `${userHome}`, `${workspaceFolderBasename}`, and `${pathSeparator}` resolution in path mappings
+- **Global Launch Configurations**: Define launch configurations in Settings that appear in every workspace, alongside `.vscode/launch.json`
+- **Exception Breakpoints**: Stop on Notice, Warning, Error, Exception, or Everything from the Breakpoints panel
+- **Disconnect**: Detach the debugger and let the target process keep running
 - **Persistent Breakpoints**: Optional setting to save and restore breakpoints across sessions
 - **Call Stack View**: Navigate through the call stack during debugging — click any frame to jump to its source
 - **Variables Panel**: Inspect variables at different scopes with expandable children
@@ -193,6 +196,7 @@ npm run dev
 | **F10** | Step Over |
 | **F11** | Step Into |
 | **Shift + F11** | Step Out |
+| *Toolbar* | Disconnect (detach without killing the process) |
 
 ## Panels
 
@@ -206,7 +210,7 @@ Add custom expressions (e.g., `$myVariable`, `$_SERVER['REQUEST_URI']`) to monit
 Navigate between stack frames to inspect variables at different levels of execution. Click any frame to jump directly to its source file and line in the editor.
 
 ### Breakpoints
-View and manage all breakpoints set across the workspace. Enable **Persistent Breakpoints** in Settings to save them to `.vscode/dap-gui.breakpoints.json` and restore them on the next session.
+View and manage all breakpoints set across the workspace. Use the **Stop On** section to break on PHP notices, warnings, errors, exceptions, or everything. Enable **Persistent Breakpoints** in Settings to save them to `.vscode/dap-gui.breakpoints.json` and restore them on the next session.
 
 ### Adapters
 Install, uninstall, and manage DAP adapters. The built-in catalog currently lists the **PHP Debug** adapter. You can also install any adapter from a `.vsix` file.
@@ -267,11 +271,31 @@ The application supports path mappings for remote debugging. Configure them in y
 
 ```json
 "pathMappings": {
-  "/server/path": "${workspaceFolder}/local/path"
+  "/server/path": "${workspaceFolder}/local/path",
+  "/wordpress": "${userHome}/Git/WordPress",
+  "/wordpress/wp-content/plugins/${workspaceFolderBasename}": "${workspaceFolder}"
 }
 ```
 
-`${workspaceFolder}` is automatically resolved to the current workspace root, so breakpoints and stack traces map correctly between server and local paths.
+The following variables are resolved in both the server and local sides of each mapping:
+
+- `${workspaceFolder}` — current workspace root
+- `${workspaceFolderBasename}` — last segment of the workspace root
+- `${userHome}` — user home directory
+- `${pathSeparator}` — `/` on macOS/Linux, `\\` on Windows
+
+Mappings are applied in order, so more specific prefixes should be listed before broader ones.
+
+## Global Launch Configurations
+
+In addition to per-project `.vscode/launch.json` files, you can define launch configurations globally in **Settings**:
+
+1. Open the **Settings** panel
+2. Scroll to **Debugger > Global Launch Configurations (JSON)**
+3. Enter a JSON object in the same format as `.vscode/launch.json`
+4. These configurations appear in the toolbar dropdown for every workspace
+
+Workspace configurations override global ones by name.
 
 ## Persistent Breakpoints
 
@@ -289,7 +313,8 @@ The code viewer always loads the latest file content from disk when you open a f
 ## Troubleshooting
 
 - **Adapter not found**: Make sure to install the appropriate debug adapter for your language
-- **Breakpoints not hit**: Check path mappings configuration. Paths that contain `${workspaceFolder}` are resolved against the opened workspace root.
+- **Breakpoints not hit**: Check path mappings configuration. Variables such as `${workspaceFolder}`, `${userHome}`, `${workspaceFolderBasename}`, and `${pathSeparator}` are resolved against the opened workspace and system environment.
+- **File outside workspace cannot be opened**: When debugging WordPress/Playground with separate core and plugin folders, make sure the more specific plugin mapping is listed before the broader WordPress core mapping, and that the local folders exist on disk.
 - **External editor not found**: Make sure the editor is on your PATH, or use the full path in the Custom editor setting
 
 ## License

@@ -32,14 +32,16 @@ export interface ElectronAPI {
   execCommand: (command: string) => Promise<{ stdout: string; stderr: string }>;
   
   // Debug session
-  debugStart: (config: Record<string, unknown>, initialBreakpoints?: [string, number[]][]) => Promise<{ success: boolean; error?: string }>;
+  debugStart: (config: Record<string, unknown>, initialBreakpoints?: [string, number[]][], initialExceptionFilters?: string[]) => Promise<{ success: boolean; error?: string }>;
   debugStop: () => Promise<{ success: boolean }>;
+  debugDetach: () => Promise<{ success: boolean }>;
   debugContinue: () => Promise<{ success: boolean }>;
   debugStepOver: () => Promise<{ success: boolean }>;
   debugStepInto: () => Promise<{ success: boolean }>;
   debugStepOut: () => Promise<{ success: boolean }>;
   debugPause: () => Promise<{ success: boolean }>;
   debugSetBreakpoints: (filePath: string, lines: number[]) => Promise<{ success: boolean }>;
+  debugSetExceptionBreakpoints: (filters: string[]) => Promise<{ success: boolean }>;
   debugFetchVariables: (variablesReference: number) => Promise<{ success: boolean; variables: unknown[] }>;
   debugEvaluate: (expression: string, frameId?: number) => Promise<{ success: boolean; result: unknown }>;
   debugIsActive: () => Promise<boolean>;
@@ -126,8 +128,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   execCommand: (command: string) => ipcRenderer.invoke('exec-command', command),
   
   // Debug session
-  debugStart: (config: Record<string, unknown>, initialBreakpoints?: [string, number[]][]) => ipcRenderer.invoke('debug-start', config, initialBreakpoints),
+  debugStart: (config: Record<string, unknown>, initialBreakpoints?: [string, number[]][], initialExceptionFilters?: string[]) => ipcRenderer.invoke('debug-start', config, initialBreakpoints, initialExceptionFilters),
   debugStop: () => ipcRenderer.invoke('debug-stop'),
+  debugDetach: () => ipcRenderer.invoke('debug-detach'),
   debugContinue: () => ipcRenderer.invoke('debug-continue'),
   debugStepOver: () => ipcRenderer.invoke('debug-step-over'),
   debugStepInto: () => ipcRenderer.invoke('debug-step-into'),
@@ -135,6 +138,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   debugPause: () => ipcRenderer.invoke('debug-pause'),
   debugSetBreakpoints: (filePath: string, lines: number[]) => 
     ipcRenderer.invoke('debug-set-breakpoints', filePath, lines),
+  debugSetExceptionBreakpoints: (filters: string[]) =>
+    ipcRenderer.invoke('debug-set-exception-breakpoints', filters),
   debugFetchVariables: (variablesReference: number) =>
     ipcRenderer.invoke('debug-fetch-variables', variablesReference),
   debugEvaluate: (expression: string, frameId?: number) =>

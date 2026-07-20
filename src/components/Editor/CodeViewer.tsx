@@ -164,17 +164,22 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
     }
   };
 
+  const [fileError, setFileError] = useState<string | null>(null);
+
   // Load file content
   useEffect(() => {
     if (!currentFile) return;
     const loadFile = async () => {
       try {
+        setFileError(null);
         const content = await fetchFileContent(currentFile);
         useEditorStore.setState((state) => ({
           fileContents: new Map(state.fileContents).set(currentFile, content),
         }));
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         console.error('Failed to load file:', err);
+        setFileError(message);
       }
     };
     if (!fileContents.has(currentFile)) {
@@ -218,6 +223,39 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
         <div className="text-center">
           <div className="text-2xl mb-2 text-text-secondary">No file open</div>
           <div className="text-sm">Open a file from the explorer to view code</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (fileError) {
+    return (
+      <div className={`${className} flex flex-col h-full`}>
+        <div className="h-9 bg-bg-secondary border-b border-border-subtle flex items-center justify-between px-3 flex-shrink-0">
+          <span className="text-text-secondary text-sm truncate" title={currentFile}>
+            {fileName}
+          </span>
+        </div>
+        <div className="flex-1 flex items-center justify-center bg-bg p-6 overflow-auto">
+          <div className="max-w-lg w-full bg-bg-secondary border border-border-subtle rounded p-4">
+            <div className="flex items-center gap-2 text-danger mb-2">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="8" cy="8" r="6" />
+                <path d="M8 5v3" />
+                <path d="M8 11h.01" />
+              </svg>
+              <span className="font-medium">Unable to open file</span>
+            </div>
+            <p className="text-sm text-text-secondary mb-3">
+              The debugger reported a file that cannot be read from this workspace:
+            </p>
+            <code className="block text-xs font-mono bg-bg-tertiary p-2 rounded break-all text-text mb-3">
+              {currentFile}
+            </code>
+            <p className="text-xs text-text-muted whitespace-pre-wrap">
+              {fileError}
+            </p>
+          </div>
         </div>
       </div>
     );
