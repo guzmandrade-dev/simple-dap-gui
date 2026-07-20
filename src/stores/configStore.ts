@@ -9,6 +9,7 @@ interface ConfigState {
 
   // Actions
   loadConfigs: () => Promise<void>;
+  loadGlobalConfigs: () => Promise<void>;
   selectConfig: (name: string) => void;
   addConfig: (config: LaunchConfiguration) => void;
   removeConfig: (name: string) => void;
@@ -25,28 +26,47 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
   theme: 'dark',
 
   loadConfigs: async () => {
-    try {
-      const vscodeConfig = await window.electronAPI?.getLaunchConfig();
-      console.log('Loaded launch config:', vscodeConfig);
-      
-      if (vscodeConfig && Array.isArray(vscodeConfig.configurations)) {
-        const configs = vscodeConfig.configurations as LaunchConfiguration[];
-        console.log('Setting configs:', configs);
-        set({ configs });
-        
-        // Select first config if none selected
-        if (!get().selectedConfig && configs.length > 0) {
-          set({ selectedConfig: configs[0] });
-        }
-      } else {
-        // Clear configs if no valid configurations
-        set({ configs: [] });
+    const [vscodeConfig, globalConfig] = await Promise.all([
+      window.electronAPI?.getLaunchConfig().catch((err) => {
+        console.error('Failed to load workspace launch config:', err);
+        return null;
+      }),
+      window.electronAPI?.getGlobalLaunchConfig().catch((err) => {
+        console.error('Failed to load global launch config:', err);
+        return null;
+      }),
+    ]);
+
+    console.log('Loaded workspace launch config:', vscodeConfig);
+    console.log('Loaded global launch config:', globalConfig);
+
+    const workspaceConfigs = (vscodeConfig && Array.isArray(vscodeConfig.configurations))
+      ? (vscodeConfig.configurations as LaunchConfiguration[])
+      : [];
+    const globalConfigs = (globalConfig && Array.isArray(globalConfig.configurations))
+      ? (globalConfig.configurations as LaunchConfiguration[])
+      : [];
+
+    // Merge: workspace configs first, then globals. Workspace entries override globals by name.
+    const merged = new Map<string, LaunchConfiguration>();
+    for (const config of [...globalConfigs, ...workspaceConfigs]) {
+      if (config?.name) {
+        merged.set(config.name, config);
       }
-    } catch (err) {
-      console.error('Failed to load configs:', err);
-      set({ configs: [] });
     }
-    
+
+    const configs = Array.from(merged.values());
+    console.log('Setting merged configs:', configs);
+    set({ configs });
+
+    // Select first config if none selected or the current selection is no longer available
+    const currentName = get().selectedConfig?.name;
+    if (configs.length > 0 && (!currentName || !configs.some(c => c.name === currentName))) {
+      set({ selectedConfig: configs[0] });
+    } else if (configs.length === 0) {
+      set({ selectedConfig: null });
+    }
+
     // Get workspace root
     try {
       const root = await window.electronAPI?.getWorkspaceRoot();
@@ -57,6 +77,10 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
     } catch (err) {
       console.error('Failed to get workspace root:', err);
     }
+  },
+
+  loadGlobalConfigs: async () => {
+    await get().loadConfigs();
   },
 
   selectConfig: (name: string) => {

@@ -73,6 +73,7 @@ export interface AppSettings {
   editorCommand: string;
   editorArgs: string;
   persistentBreakpoints: boolean;
+  globalLaunchConfigJson: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -80,6 +81,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   editorCommand: 'code',
   editorArgs: '{file}',
   persistentBreakpoints: false,
+  globalLaunchConfigJson: '',
 };
 
 const SETTINGS_FILENAME = 'settings.json';
@@ -672,20 +674,39 @@ ipcMain.handle('exec-command', async (_event, command: string) => {
   });
 });
 
-ipcMain.handle('get-launch-config', async () => {
+function parseLaunchJson(content: string): { configurations: LaunchConfiguration[] } | null {
   try {
-    const configPath = path.join(currentProjectPath || process.cwd(), '.vscode', 'launch.json');
-    const content = await fs.readFile(configPath, 'utf-8');
-
     // Remove comments from JSON (VS Code allows comments in launch.json)
     const cleanedContent = content
       .replace(/\/\/.*$/gm, '')
       .replace(/\/\*[\s\S]*?\*\//g, '');
 
-    return JSON.parse(cleanedContent);
+    const parsed = JSON.parse(cleanedContent);
+    if (parsed && Array.isArray(parsed.configurations)) {
+      return parsed as { configurations: LaunchConfiguration[] };
+    }
+    return null;
   } catch {
     return null;
   }
+}
+
+ipcMain.handle('get-launch-config', async () => {
+  try {
+    const configPath = path.join(currentProjectPath || process.cwd(), '.vscode', 'launch.json');
+    const content = await fs.readFile(configPath, 'utf-8');
+    return parseLaunchJson(content);
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('get-global-launch-config', async () => {
+  const settings = await loadSettings();
+  if (!settings.globalLaunchConfigJson || !settings.globalLaunchConfigJson.trim()) {
+    return null;
+  }
+  return parseLaunchJson(settings.globalLaunchConfigJson);
 });
 
 ipcMain.handle('get-workspace-root', () => {

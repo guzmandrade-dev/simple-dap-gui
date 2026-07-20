@@ -15,7 +15,7 @@ const MIN_EDITOR_WIDTH = 300;
 
 function App() {
   const { initialize, isSessionActive, isPaused, startSession, stopSession, continue: continueExecution, stepOver, stepInto, stepOut, reloadBreakpoints } = useDebugStore();
-  const { loadConfigs, setWorkspaceRoot, loadTheme, selectedConfig } = useConfigStore();
+  const { loadConfigs, loadGlobalConfigs, setWorkspaceRoot, loadTheme, selectedConfig } = useConfigStore();
   const { openFile } = useEditorStore();
   const [explorerWidth, setExplorerWidth] = useState(250);
   const [sidebarWidth, setSidebarWidth] = useState(280);
@@ -52,9 +52,15 @@ function App() {
       }
     });
 
+    const unsubscribeSettings = window.electronAPI?.onSettingsChanged(() => {
+      console.log('Settings changed, reloading configs');
+      loadGlobalConfigs();
+    });
+
     return () => {
       unsubscribeFolder?.();
       unsubscribeWorkspace?.();
+      unsubscribeSettings?.();
     };
   }, []);
 

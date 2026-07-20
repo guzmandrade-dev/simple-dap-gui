@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import * as path from 'path';
 import {
   resolvePathMappings,
   resolveLocalToServerPath,
@@ -56,6 +57,35 @@ describe('resolvePathMappings', () => {
       '/home/user'
     );
     expect(result).toBe('/home/user//home/user/index.php');
+  });
+
+  it('resolves userHome in server and local prefixes', () => {
+    const home = process.env.HOME || process.env.USERPROFILE || '';
+    const result = resolvePathMappings(
+      '/server/home/index.php',
+      { '/server/home': '${userHome}/project' },
+      '/home/user/workspace'
+    );
+    expect(result).toBe(home.replace(/\\\\/g, '/') + '/project/index.php');
+  });
+
+  it('resolves workspaceFolderBasename in local prefix', () => {
+    const result = resolvePathMappings(
+      '/server/index.php',
+      { '/server': '/tmp/${workspaceFolderBasename}' },
+      '/home/user/my-project'
+    );
+    expect(result).toBe('/tmp/my-project/index.php');
+  });
+
+  it('resolves pathSeparator in local prefix', () => {
+    const sep = path.sep;
+    const result = resolvePathMappings(
+      '/server/index.php',
+      { '/server/': '${workspaceFolder}${pathSeparator}' },
+      '/home/user/project'
+    );
+    expect(result).toBe('/home/user/project' + sep + 'index.php');
   });
 });
 

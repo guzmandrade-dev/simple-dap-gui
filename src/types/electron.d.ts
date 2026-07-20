@@ -20,6 +20,7 @@ export interface ElectronAPI {
   writeFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>;
   createDirectory: (path: string) => Promise<{ success: boolean; error?: string }>;
   getLaunchConfig: () => Promise<Record<string, unknown> | null>;
+  getGlobalLaunchConfig: () => Promise<Record<string, unknown> | null>;
   getWorkspaceRoot: () => Promise<string>;
   setWorkspaceRoot: (root: string) => Promise<string>;
   pathResolve: (...paths: string[]) => Promise<string>;
@@ -31,9 +32,9 @@ export interface ElectronAPI {
   onWorkspaceChanged: (callback: (path: string) => void) => () => void;
 
   // Settings
-  getAppSettings: () => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean }>;
-  setAppSettings: (settings: Partial<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean }>) => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean }>;
-  onSettingsChanged: (callback: (settings: { theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean }) => void) => () => void;
+  getAppSettings: () => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean; globalLaunchConfigJson: string }>;
+  setAppSettings: (settings: Partial<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean; globalLaunchConfigJson: string }>) => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean; globalLaunchConfigJson: string }>;
+  onSettingsChanged: (callback: (settings: { theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean; globalLaunchConfigJson: string }) => void) => () => void;
   getAppVersion: () => Promise<string>;
 
   // Window controls

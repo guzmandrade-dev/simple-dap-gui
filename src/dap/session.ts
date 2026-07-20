@@ -247,25 +247,41 @@ export class DebugSession {
     }
   }
 
-  private resolveLocalPrefix(localPrefix: string): string {
-    return localPrefix.replace(/\$\{workspaceFolder\}/g, this.workspaceRoot);
+  private getVariableContext() {
+    return {
+      userHome: process.env.HOME || process.env.USERPROFILE || '',
+      workspaceFolder: this.workspaceRoot,
+      workspaceFolderBasename: this.workspaceRoot.split(/[\\\\/]/).filter(Boolean).pop() || '',
+      pathSeparator: path.sep,
+    };
+  }
+
+  private resolveVariables(value: string): string {
+    const ctx = this.getVariableContext();
+    return value
+      .replace(/\$\{userHome\}/g, ctx.userHome)
+      .replace(/\$\{workspaceFolder\}/g, ctx.workspaceFolder)
+      .replace(/\$\{workspaceFolderBasename\}/g, ctx.workspaceFolderBasename)
+      .replace(/\$\{pathSeparator\}/g, ctx.pathSeparator);
   }
 
   serverToLocalPath(serverPath: string): string {
     // Apply explicit path mappings to convert server path to local path
     for (const [serverPrefix, localPrefix] of Object.entries(this.pathMappings)) {
-      if (serverPath.startsWith(serverPrefix)) {
-        return serverPath.replace(serverPrefix, this.resolveLocalPrefix(localPrefix));
+      const resolvedServerPrefix = this.resolveVariables(serverPrefix);
+      const resolvedLocalPrefix = this.resolveVariables(localPrefix);
+      if (serverPath.startsWith(resolvedServerPrefix)) {
+        return serverPath.replace(resolvedServerPrefix, resolvedLocalPrefix);
       }
     }
 
     // Fallback: some adapters embed ${workspaceFolder} directly in the server
     // path (e.g. /some/prefix/${workspaceFolder}/file.php). Treat the placeholder
     // as the project root and use everything after it as the relative path.
-    const placeholder = '${workspaceFolder}';
-    const pivot = serverPath.indexOf(placeholder);
+    const resolvedPlaceholder = this.resolveVariables('${workspaceFolder}');
+    const pivot = serverPath.indexOf(resolvedPlaceholder);
     if (pivot !== -1) {
-      const suffix = serverPath.slice(pivot + placeholder.length);
+      const suffix = serverPath.slice(pivot + resolvedPlaceholder.length);
       return path.join(this.workspaceRoot, suffix.replace(/^[\\/]+/, ''));
     }
 
@@ -276,9 +292,10 @@ export class DebugSession {
   private localToServerPath(localPath: string): string {
     // Apply path mappings to convert local path to server path
     for (const [serverPrefix, localPrefix] of Object.entries(this.pathMappings)) {
-      const resolvedLocal = this.resolveLocalPrefix(localPrefix);
-      if (localPath.startsWith(resolvedLocal)) {
-        return localPath.replace(resolvedLocal, serverPrefix);
+      const resolvedServerPrefix = this.resolveVariables(serverPrefix);
+      const resolvedLocalPrefix = this.resolveVariables(localPrefix);
+      if (localPath.startsWith(resolvedLocalPrefix)) {
+        return localPath.replace(resolvedLocalPrefix, resolvedServerPrefix);
       }
     }
     // If no mapping matches, return as-is

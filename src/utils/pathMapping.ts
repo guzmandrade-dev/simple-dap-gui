@@ -1,14 +1,41 @@
 // Path mapping utilities for converting between server and local paths
 
+export interface VariableContext {
+  userHome: string;
+  workspaceFolder: string;
+  workspaceFolderBasename: string;
+  pathSeparator: string;
+}
+
+export function getDefaultVariableContext(workspaceRoot: string): VariableContext {
+  const workspaceFolder = workspaceRoot || (typeof process !== 'undefined' ? process.cwd() : '/');
+  return {
+    userHome: (typeof process !== 'undefined' ? (process.env.HOME || process.env.USERPROFILE || '') : '/home/user'),
+    workspaceFolder,
+    workspaceFolderBasename: workspaceFolder.split(/[\\/]/).filter(Boolean).pop() || '',
+    pathSeparator: (typeof process !== 'undefined' ? require('path').sep : '/'),
+  };
+}
+
+export function resolveVariables(value: string, context: VariableContext): string {
+  return value
+    .replace(/\$\{userHome\}/g, context.userHome)
+    .replace(/\$\{workspaceFolder\}/g, context.workspaceFolder)
+    .replace(/\$\{workspaceFolderBasename\}/g, context.workspaceFolderBasename)
+    .replace(/\$\{pathSeparator\}/g, context.pathSeparator);
+}
+
 export function resolvePathMappings(
   serverPath: string,
   mappings: Record<string, string>,
   workspaceRoot: string
 ): string {
+  const context = getDefaultVariableContext(workspaceRoot);
   for (const [serverPrefix, localPrefix] of Object.entries(mappings)) {
-    const resolvedLocal = localPrefix.replace(/\$\{workspaceFolder\}/g, workspaceRoot);
-    if (serverPath.startsWith(serverPrefix)) {
-      return serverPath.replace(serverPrefix, resolvedLocal);
+    const resolvedServerPrefix = resolveVariables(serverPrefix, context);
+    const resolvedLocal = resolveVariables(localPrefix, context);
+    if (serverPath.startsWith(resolvedServerPrefix)) {
+      return serverPath.replace(resolvedServerPrefix, resolvedLocal);
     }
   }
   return serverPath;
@@ -19,10 +46,12 @@ export function resolveLocalToServerPath(
   mappings: Record<string, string>,
   workspaceRoot: string
 ): string {
+  const context = getDefaultVariableContext(workspaceRoot);
   for (const [serverPrefix, localPrefix] of Object.entries(mappings)) {
-    const resolvedLocal = localPrefix.replace(/\$\{workspaceFolder\}/g, workspaceRoot);
+    const resolvedServerPrefix = resolveVariables(serverPrefix, context);
+    const resolvedLocal = resolveVariables(localPrefix, context);
     if (localPath.startsWith(resolvedLocal)) {
-      return localPath.replace(resolvedLocal, serverPrefix);
+      return localPath.replace(resolvedLocal, resolvedServerPrefix);
     }
   }
   return localPath;

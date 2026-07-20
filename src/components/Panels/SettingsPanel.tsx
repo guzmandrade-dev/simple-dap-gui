@@ -5,12 +5,14 @@ interface Settings {
   editorCommand: string;
   editorArgs: string;
   persistentBreakpoints: boolean;
+  globalLaunchConfigJson: string;
 }
 
 const DEFAULT_SETTINGS: Settings = {
   editorCommand: 'code',
   editorArgs: '{file}',
   persistentBreakpoints: false,
+  globalLaunchConfigJson: '',
 };
 
 function quotePath(filePath: string): string {
@@ -56,10 +58,11 @@ export function SettingsPanel() {
 
         const appSettings = await window.electronAPI?.getAppSettings();
         if (appSettings) {
-          const next = {
+          const next: Settings = {
             editorCommand: appSettings.editorCommand,
             editorArgs: appSettings.editorArgs,
             persistentBreakpoints: appSettings.persistentBreakpoints,
+            globalLaunchConfigJson: appSettings.globalLaunchConfigJson ?? '',
           };
           setSettings(next);
           const mode = detectEditorMode(next.editorCommand);
@@ -75,10 +78,11 @@ export function SettingsPanel() {
     load();
 
     const unsubscribe = window.electronAPI?.onSettingsChanged((appSettings) => {
-      const next = {
+      const next: Settings = {
         editorCommand: appSettings.editorCommand,
         editorArgs: appSettings.editorArgs,
         persistentBreakpoints: appSettings.persistentBreakpoints,
+        globalLaunchConfigJson: appSettings.globalLaunchConfigJson ?? '',
       };
       setSettings(next);
       const mode = detectEditorMode(next.editorCommand);
@@ -114,6 +118,7 @@ export function SettingsPanel() {
         editorCommand: settings.editorCommand,
         editorArgs: settings.editorArgs,
         persistentBreakpoints: settings.persistentBreakpoints,
+        globalLaunchConfigJson: settings.globalLaunchConfigJson,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -220,6 +225,20 @@ export function SettingsPanel() {
           <p className="text-xs text-text-muted">
             Save breakpoints to <code className="bg-bg-tertiary px-1 rounded">.vscode/dap-gui.breakpoints.json</code> and restore them on project open.
           </p>
+
+          <div>
+            <label className="block text-xs text-text-secondary mb-1">Global Launch Configurations (JSON)</label>
+            <textarea
+              value={settings.globalLaunchConfigJson}
+              onChange={(e) => setSettings({ ...settings, globalLaunchConfigJson: e.target.value })}
+              className="w-full font-mono text-xs"
+              rows={8}
+              placeholder={`{\n  \"configurations\": [\n    {\n      \"name\": \"Global PHP Listen\",\n      \"type\": \"php\",\n      \"request\": \"launch\",\n      \"port\": 9003\n    }\n  ]\n}`}
+            />
+            <p className="text-xs text-text-muted mt-1">
+              JSON in the same format as <code className="bg-bg-tertiary px-1 rounded">.vscode/launch.json</code>. These configurations appear in the debug dropdown for every workspace.
+            </p>
+          </div>
         </div>
       </section>
 
