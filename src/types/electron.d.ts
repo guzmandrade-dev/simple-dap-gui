@@ -35,6 +35,10 @@ export interface ElectronAPI {
   onFolderOpened: (callback: (path: string) => void) => () => void;
   onWorkspaceChanged: (callback: (path: string) => void) => () => void;
 
+  // Menu-driven actions
+  onOpenSearch: (callback: (mode: 'files' | 'content') => void) => () => void;
+  onDebugAction: (callback: (action: string) => void) => () => void;
+
   // Settings
   getAppSettings: () => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean; globalLaunchConfigJson: string }>;
   setAppSettings: (settings: Partial<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean; globalLaunchConfigJson: string }>) => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean; globalLaunchConfigJson: string }>;

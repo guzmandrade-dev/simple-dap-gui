@@ -40,6 +40,8 @@ export function TitleBar() {
         <span className="text-sm font-medium text-text">simple-dap-gui</span>
       </div>
 
+      {/* On macOS the native traffic lights are shown; hide custom controls. */}
+      {process.platform !== 'darwin' && (
       <div className="flex items-center app-no-drag-region">
         <button
           onClick={handleMinimize}
@@ -81,6 +83,7 @@ export function TitleBar() {
           </svg>
         </button>
       </div>
+      )}
     </div>
   );
 }

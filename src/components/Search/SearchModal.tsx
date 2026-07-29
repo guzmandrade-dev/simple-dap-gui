@@ -17,6 +17,7 @@ type SearchMode = 'files' | 'content';
 
 interface SearchModalProps {
   isOpen: boolean;
+  initialMode?: 'files' | 'content';
   onClose: () => void;
 }
 
@@ -54,9 +55,9 @@ function IconClose({ className }: { className?: string }) {
   );
 }
 
-export function SearchModal({ isOpen, onClose }: SearchModalProps) {
+export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchModalProps) {
   const [query, setQuery] = useState('');
-  const [mode, setMode] = useState<SearchMode>('files');
+  const [mode, setMode] = useState<SearchMode>(initialMode);
   const [fileResults, setFileResults] = useState<SearchFileResult[]>([]);
   const [contentResults, setContentResults] = useState<SearchContentResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -75,11 +76,11 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
       setContentResults([]);
       setError(null);
       setSelectedIndex(0);
-      setMode('files');
+      setMode(initialMode);
       // Focus on next tick so the modal is rendered
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [isOpen]);
+  }, [isOpen, initialMode]);
 
   const performSearch = useCallback(async (searchQuery: string, searchMode: SearchMode) => {
     if (!searchQuery.trim()) {

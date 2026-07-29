@@ -1,5 +1,4 @@
 // Path mapping utilities for converting between server and local paths
-import * as path from 'path';
 
 function getPathSeparator(): string {
   if (typeof process !== 'undefined' && process.platform) {
@@ -91,9 +90,29 @@ export function isAbsolutePath(path: string): boolean {
 }
 
 export function isPathInside(parent: string, child: string): boolean {
-  const normalizedParent = normalizePath(path.resolve(parent));
-  const normalizedChild = normalizePath(path.resolve(child));
+  const normalizedParent = normalizePath(resolvePath(parent));
+  const normalizedChild = normalizePath(resolvePath(child));
   if (normalizedParent === normalizedChild) return true;
   const prefix = normalizedParent.endsWith('/') ? normalizedParent : normalizedParent + '/';
   return normalizedChild.startsWith(prefix);
+}
+
+function resolvePath(input: string): string {
+  // Minimal path.resolve replacement that works in both renderer and main.
+  // We cannot use Node's 'path' module in the renderer because it is sandboxed.
+  const parts = input.replace(/\\/g, '/').split('/').filter(p => p.length > 0 && p !== '.');
+  const resolved: string[] = [];
+  for (const part of parts) {
+    if (part === '..') {
+      resolved.pop();
+    } else {
+      resolved.push(part);
+    }
+  }
+  const isAbsoluteUnix = input.startsWith('/');
+  const isAbsoluteWindows = /^[a-zA-Z]:/.test(input);
+  if (isAbsoluteWindows) {
+    return input.slice(0, 2) + '\\' + resolved.join('\\');
+  }
+  return (isAbsoluteUnix ? '/' : '') + resolved.join('/');
 }

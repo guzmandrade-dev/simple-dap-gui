@@ -23,6 +23,10 @@ export interface ElectronAPI {
   onFolderOpened: (callback: (path: string) => void) => () => void;
   onWorkspaceChanged: (callback: (path: string) => void) => () => void;
 
+  // Menu-driven actions
+  onOpenSearch: (callback: (mode: 'files' | 'content') => void) => () => void;
+  onDebugAction: (callback: (action: string) => void) => () => void;
+
   // Settings
   getAppSettings: () => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean; globalLaunchConfigJson: string }>;
   setAppSettings: (settings: Partial<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean; globalLaunchConfigJson: string }>) => Promise<{ theme: 'dark' | 'light'; editorCommand: string; editorArgs: string; persistentBreakpoints: boolean; globalLaunchConfigJson: string }>;
@@ -117,6 +121,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (_event: unknown, path: string) => callback(path);
     ipcRenderer.on('workspace-changed', handler);
     return () => ipcRenderer.removeListener('workspace-changed', handler);
+  },
+
+  // Menu-driven actions
+  onOpenSearch: (callback: (mode: 'files' | 'content') => void) => {
+    const handler = (_event: unknown, mode: 'files' | 'content') => callback(mode);
+    ipcRenderer.on('open-search', handler);
+    return () => ipcRenderer.removeListener('open-search', handler);
+  },
+  onDebugAction: (callback: (action: string) => void) => {
+    const handler = (_event: unknown, action: string) => callback(action);
+    ipcRenderer.on('debug-action', handler);
+    return () => ipcRenderer.removeListener('debug-action', handler);
   },
 
   // Settings

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { watch as fsWatch, FSWatcher, existsSync, statSync } from 'fs';
@@ -331,10 +331,15 @@ const createWindow = () => {
       nodeIntegration: false,
       sandbox: true,
     },
-    titleBarStyle: 'hidden',
+    // Use the native menu bar on macOS and a hidden title bar on Windows/Linux.
+    // The custom TitleBar component is kept for Windows/Linux window controls.
+    titleBarStyle: process.platform === 'darwin' ? 'default' : 'hidden',
     titleBarOverlay: false,
+    autoHideMenuBar: process.platform !== 'darwin',
     show: false,
   });
+
+  buildMenu();
 
   // Load the app
   if (process.env.VITE_DEV_SERVER_URL) {
@@ -355,6 +360,107 @@ const createWindow = () => {
     mainWindow = null;
   });
 };
+
+// Build the application menu. On macOS this becomes the top menu bar;
+// on Windows/Linux it is shown when Alt is pressed because autoHideMenuBar is enabled.
+function buildMenu() {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Open Folder',
+          accelerator: process.platform === 'darwin' ? 'Cmd+O' : 'Ctrl+O',
+          click: () => openFolder(),
+        },
+        { type: 'separator' },
+        {
+          label: 'Search Files',
+          accelerator: process.platform === 'darwin' ? 'Cmd+P' : 'Ctrl+P',
+          click: () => mainWindow?.webContents.send('open-search', 'files'),
+        },
+        {
+          label: 'Search Content',
+          accelerator: process.platform === 'darwin' ? 'Cmd+Shift+F' : 'Ctrl+Shift+F',
+          click: () => mainWindow?.webContents.send('open-search', 'content'),
+        },
+        { type: 'separator' },
+        {
+          label: 'Reload',
+          accelerator: 'CmdOrCtrl+R',
+          click: () => mainWindow?.webContents.reload(),
+        },
+        {
+          label: 'Toggle Developer Tools',
+          accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
+          click: () => mainWindow?.webContents.toggleDevTools(),
+        },
+        { type: 'separator' },
+        {
+          label: 'Quit',
+          accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
+          click: () => app.quit(),
+        },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Start Debugging',
+          accelerator: 'F5',
+          click: () => mainWindow?.webContents.send('debug-action', 'start'),
+        },
+        {
+          label: 'Stop Debugging',
+          accelerator: 'Shift+F5',
+          click: () => mainWindow?.webContents.send('debug-action', 'stop'),
+        },
+        { type: 'separator' },
+        {
+          label: 'Step Over',
+          accelerator: 'F10',
+          click: () => mainWindow?.webContents.send('debug-action', 'stepOver'),
+        },
+        {
+          label: 'Step Into',
+          accelerator: 'F11',
+          click: () => mainWindow?.webContents.send('debug-action', 'stepInto'),
+        },
+        {
+          label: 'Step Out',
+          accelerator: 'Shift+F11',
+          click: () => mainWindow?.webContents.send('debug-action', 'stepOut'),
+        },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'close' },
+        { type: 'separator' },
+        { role: 'reload' },
+        { role: 'toggleDevTools' },
+      ],
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
 
 // Open folder dialog
 async function openFolder() {

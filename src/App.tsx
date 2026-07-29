@@ -24,6 +24,7 @@ function App() {
   const [isEditorCollapsed, setIsEditorCollapsed] = useState(false);
   const [preCollapseWidths, setPreCollapseWidths] = useState({ explorer: 250, sidebar: 280 });
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchInitialMode, setSearchInitialMode] = useState<'files' | 'content'>('files');
   const mainRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const suppressAutoCollapse = useRef(false);
@@ -60,12 +61,34 @@ function App() {
       loadGlobalConfigs();
     });
 
+    const unsubscribeOpenSearch = window.electronAPI?.onOpenSearch((mode) => {
+      setSearchInitialMode(mode);
+      setIsSearchOpen(true);
+    });
+
+    const unsubscribeDebugAction = window.electronAPI?.onDebugAction((action) => {
+      if (action === 'start') {
+        if (!isSessionActive && selectedConfig) startSession(selectedConfig);
+        else if (isSessionActive && isPaused) continueExecution();
+      } else if (action === 'stop') {
+        if (isSessionActive) stopSession();
+      } else if (action === 'stepOver') {
+        if (isSessionActive && isPaused) stepOver();
+      } else if (action === 'stepInto') {
+        if (isSessionActive && isPaused) stepInto();
+      } else if (action === 'stepOut') {
+        if (isSessionActive && isPaused) stepOut();
+      }
+    });
+
     return () => {
       unsubscribeFolder?.();
       unsubscribeWorkspace?.();
       unsubscribeSettings?.();
+      unsubscribeOpenSearch?.();
+      unsubscribeDebugAction?.();
     };
-  }, []);
+  }, [continueExecution, isPaused, isSessionActive, selectedConfig, startSession, stepInto, stepOut, stepOver, stopSession]);
 
   // Auto-collapse editor when it gets too small from sidebar dragging or window resize
   useEffect(() => {
@@ -181,6 +204,7 @@ function App() {
       // Ctrl+P / Cmd+P: Search files
       if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
         e.preventDefault();
+        setSearchInitialMode('files');
         setIsSearchOpen(true);
         return;
       }
@@ -188,6 +212,7 @@ function App() {
       // Ctrl+Shift+F / Cmd+Shift+F: Search content
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
         e.preventDefault();
+        setSearchInitialMode('content');
         setIsSearchOpen(true);
         return;
       }
@@ -332,7 +357,7 @@ function App() {
 
       <StatusBar isActive={isSessionActive} />
 
-      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <SearchModal isOpen={isSearchOpen} initialMode={searchInitialMode} onClose={() => setIsSearchOpen(false)} />
     </div>
   );
 }
