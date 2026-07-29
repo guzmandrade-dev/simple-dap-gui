@@ -18,7 +18,8 @@
   --color-danger-text: #0f1115;
   --color-warning: #e8a13a;
   --color-warning-text: #0f1115;
-  --color-current-line: rgba(232, 161, 58, 0.12);
+  --color-current-line: rgba(232, 161, 58, 0.16);
+  --color-current-line-accent: rgba(79, 142, 247, 0.18);
 
   --syntax-comment: #6b7280;
   --syntax-punctuation: #a8adb8;

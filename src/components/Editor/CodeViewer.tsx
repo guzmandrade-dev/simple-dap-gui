@@ -115,9 +115,8 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { currentFile, fileContents, reloadFile } = useEditorStore();
+  const { currentFile, currentLine, fileContents, reloadFile, setCurrentLine } = useEditorStore();
   const {
-    currentLine,
     isPaused,
     breakpoints,
     setBreakpoint,
@@ -203,11 +202,14 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
     }
   }, [currentFile, fileBPs, setBreakpoint, removeBreakpoint]);
 
-  // Scroll current line into view
+  // Scroll current line into view only when it comes from an external jump
+  // (e.g. search result or debug stop), not from a user click inside the viewer.
+  const lastJumpedLineRef = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (!currentLine || !scrollRef.current) return;
     if (currentLine < 1 || currentLine > lines.length) return;
-    // Calculate approximate scroll position instead of using refs
+    if (lastJumpedLineRef.current === currentLine) return;
+    lastJumpedLineRef.current = currentLine;
     const lineHeight = 20;
     const targetScroll = (currentLine - 1) * lineHeight - scrollRef.current.clientHeight / 2 + lineHeight / 2;
     scrollRef.current.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
@@ -302,14 +304,20 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
             {visibleLines.map((_, i) => {
               const lineNum = i + 1;
               const hasBP = fileBPs?.has(lineNum);
-              const isCurrent = currentLine === lineNum && isPaused;
+              const isCurrent = currentLine === lineNum;
+              const isDebugCurrent = isCurrent && isPaused;
               return (
                 <div
                   key={`gutter-${lineNum}`}
-                  onClick={() => toggleBreakpoint(lineNum)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleBreakpoint(lineNum);
+                  }}
                   className={`
                     px-2 cursor-pointer flex items-center justify-end gap-1
-                    ${isCurrent ? 'bg-current-line text-warning' : 'text-text-muted hover:text-text hover:bg-bg-tertiary'}
+                    ${isDebugCurrent ? 'bg-current-line text-warning' : ''}
+                    ${isCurrent && !isDebugCurrent ? 'bg-current-line-accent text-success font-semibold' : ''}
+                    ${!isCurrent ? 'text-text-muted hover:text-text hover:bg-bg-tertiary' : ''}
                   `}
                   style={{ height: '20px' }}
                   title={hasBP ? 'Remove breakpoint' : 'Add breakpoint'}
@@ -326,15 +334,21 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
           <div className="flex-1 min-w-0">
             {visibleLines.map((line, i) => {
               const lineNum = i + 1;
-              const isCurrent = currentLine === lineNum && isPaused;
+              const isCurrent = currentLine === lineNum;
+              const isDebugCurrent = isCurrent && isPaused;
               const highlighted = highlightLine(line, prismLang);
 
               return (
                 <div
                   key={`line-${lineNum}`}
+                  onClick={() => {
+                    lastJumpedLineRef.current = currentLine;
+                    setCurrentLine(lineNum);
+                  }}
                   className={`
-                    px-3 whitespace-pre
-                    ${isCurrent ? 'bg-current-line border-l-2 border-warning' : ''}
+                    px-3 whitespace-pre cursor-text
+                    ${isDebugCurrent ? 'bg-current-line border-l-2 border-warning' : ''}
+                    ${isCurrent && !isDebugCurrent ? 'bg-current-line-accent border-l-2 border-success/60' : ''}
                   `}
                   style={{ height: '20px' }}
                   dangerouslySetInnerHTML={{ __html: highlighted || '&nbsp;' }}

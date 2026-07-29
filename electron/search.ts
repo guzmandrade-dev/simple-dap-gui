@@ -81,6 +81,13 @@ export async function searchFileNames(
   }));
 }
 
+function toAbsolutePath(rootPath: string, filePath: string): string {
+  if (path.isAbsolute(filePath)) {
+    return filePath;
+  }
+  return path.join(rootPath, filePath);
+}
+
 export async function searchFileContent(
   rootPath: string,
   query: string,
@@ -164,8 +171,9 @@ async function runRipgrepSearch(
           const parsed = JSON.parse(line);
           if (parsed.type === 'match' && parsed.data) {
             const data = parsed.data;
+            const relativePath = data.path?.text || '';
             matches.push({
-              path: data.path?.text || '',
+              path: toAbsolutePath(rootPath, relativePath),
               line: data.line_number || 0,
               text: (data.lines?.text || '').replace(/\r?\n$/, ''),
             });
@@ -210,12 +218,11 @@ async function runJsContentSearch(
 
       const content = await fs.readFile(filePath, 'utf-8');
       const lines = content.split(/\r?\n/);
-      const relativePath = path.relative(rootPath, filePath);
 
       for (let i = 0; i < lines.length; i++) {
         if (pattern.test(lines[i])) {
           results.push({
-            path: relativePath,
+            path: filePath,
             line: i + 1,
             text: lines[i].slice(0, 200),
           });

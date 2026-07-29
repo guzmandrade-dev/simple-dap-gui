@@ -194,11 +194,11 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/40">
-      <div className="bg-bg-secondary border border-border shadow-xl w-full max-w-2xl mx-4 rounded-lg overflow-hidden flex flex-col max-h-[80vh]">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-24 bg-black/40 dark:bg-black/60 backdrop-blur-sm">
+      <div className="bg-bg-secondary border border-border shadow-2xl w-full max-w-2xl mx-4 rounded-xl overflow-hidden flex flex-col max-h-[80vh]">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border-subtle">
-          <IconSearch className="text-text-muted" />
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border-subtle bg-bg-tertiary">
+          <IconSearch className="text-text-secondary" />
           <input
             ref={inputRef}
             type="text"
@@ -206,11 +206,11 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={mode === 'files' ? 'Search files by name...' : 'Search file contents...'}
-            className="flex-1 bg-transparent border-none outline-none text-text placeholder:text-text-muted text-base"
+            className="flex-1 bg-transparent border-none outline-none text-text placeholder:text-text-muted text-base font-medium"
           />
           <button
             onClick={onClose}
-            className="text-text-muted hover:text-text p-1"
+            className="text-text-secondary hover:text-text p-1.5 rounded hover:bg-bg-hover transition-colors"
             title="Close (Esc)"
             aria-label="Close search"
           >
@@ -219,12 +219,12 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
         </div>
 
         {/* Mode tabs */}
-        <div className="flex items-center gap-1 px-3 py-2 border-b border-border-subtle bg-bg-tertiary/30">
+        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border-subtle bg-bg-secondary">
           <button
             onClick={() => setMode('files')}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
               mode === 'files'
-                ? 'bg-accent text-accent-text'
+                ? 'bg-accent text-accent-text shadow-sm'
                 : 'text-text-secondary hover:text-text hover:bg-bg-tertiary'
             }`}
           >
@@ -233,9 +233,9 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
           </button>
           <button
             onClick={() => setMode('content')}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
               mode === 'content'
-                ? 'bg-accent text-accent-text'
+                ? 'bg-accent text-accent-text shadow-sm'
                 : 'text-text-secondary hover:text-text hover:bg-bg-tertiary'
             }`}
           >
@@ -243,12 +243,12 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
             <span>Content</span>
           </button>
           <span className="ml-auto text-xs text-text-muted">
-            {isLoading ? 'Searching...' : `${allResults.length} results`}
+            {isLoading ? 'Searching...' : `${allResults.length} result${allResults.length !== 1 ? 's' : ''}`}
           </span>
         </div>
 
         {/* Results */}
-        <div ref={listRef} className="flex-1 overflow-auto min-h-0">
+        <div ref={listRef} className="flex-1 overflow-auto min-h-0 bg-bg-secondary">
           {error && (
             <div className="p-4 text-danger text-sm">
               {error}
@@ -256,14 +256,14 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
           )}
 
           {!error && allResults.length === 0 && !isLoading && query.trim() && (
-            <div className="p-6 text-center text-text-muted text-sm">
-              No results found for "{query}"
+            <div className="p-8 text-center text-text-secondary text-sm">
+              No results found for <span className="text-text font-medium">"{query}"</span>
             </div>
           )}
 
           {!error && allResults.length === 0 && !query.trim() && (
-            <div className="p-6 text-center text-text-muted text-sm">
-              Type to search {mode === 'files' ? 'files' : 'file contents'}
+            <div className="p-8 text-center text-text-secondary text-sm">
+              Type to search {mode === 'files' ? 'files by name' : 'file contents'}
             </div>
           )}
 
@@ -277,14 +277,14 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
                   data-index={index}
                   onClick={() => handleSelect(index)}
                   onMouseEnter={() => setSelectedIndex(index)}
-                  className={`px-4 py-2 cursor-pointer flex items-center gap-3 ${
-                    isSelected ? 'bg-accent text-accent-text' : 'text-text hover:bg-bg-tertiary'
+                  className={`px-4 py-2.5 cursor-pointer flex items-center gap-3 border-b border-border-subtle last:border-b-0 ${
+                    isSelected ? 'bg-accent text-accent-text' : 'text-text hover:bg-bg-hover'
                   }`}
                 >
-                  <IconFile className={isSelected ? 'text-accent-text' : 'text-text-muted'} />
+                  <IconFile className={isSelected ? 'text-accent-text' : 'text-text-secondary'} />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm truncate font-medium">{getFileName(result.path)}</div>
-                    <div className={`text-xs truncate ${isSelected ? 'text-accent-text/80' : 'text-text-muted'}`}>
+                    <div className={`text-xs truncate ${isSelected ? 'text-accent-text/90' : 'text-text-muted'}`}>
                       {normalized}
                     </div>
                   </div>
@@ -299,17 +299,17 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
                 data-index={index}
                 onClick={() => handleSelect(index)}
                 onMouseEnter={() => setSelectedIndex(index)}
-                className={`px-4 py-2 cursor-pointer flex items-start gap-3 ${
-                  isSelected ? 'bg-accent text-accent-text' : 'text-text hover:bg-bg-tertiary'
+                className={`px-4 py-2.5 cursor-pointer flex items-start gap-3 border-b border-border-subtle last:border-b-0 ${
+                  isSelected ? 'bg-accent text-accent-text' : 'text-text hover:bg-bg-hover'
                 }`}
               >
-                <IconText className={isSelected ? 'text-accent-text mt-0.5' : 'text-text-muted mt-0.5'} />
+                <IconText className={isSelected ? 'text-accent-text mt-0.5' : 'text-text-secondary mt-0.5'} />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm truncate font-medium">{getFileName(result.path)}:{result.line}</div>
-                  <div className={`text-xs truncate font-mono ${isSelected ? 'text-accent-text/80' : 'text-text-muted'}`}>
+                  <div className={`text-xs truncate font-mono ${isSelected ? 'text-accent-text/90' : 'text-text-secondary'}`}>
                     {result.text}
                   </div>
-                  <div className={`text-xs truncate ${isSelected ? 'text-accent-text/70' : 'text-text-muted'}`}>
+                  <div className={`text-xs truncate ${isSelected ? 'text-accent-text/80' : 'text-text-muted'}`}>
                     {normalized}
                   </div>
                 </div>
@@ -319,7 +319,7 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-2 border-t border-border-subtle text-xs text-text-muted flex items-center justify-between">
+        <div className="px-4 py-2.5 border-t border-border-subtle bg-bg-tertiary text-xs text-text-muted flex items-center justify-between">
           <span>↑↓ to navigate · Enter to open · Esc to close</span>
           <span>Powered by fuzzysort / ripgrep</span>
         </div>

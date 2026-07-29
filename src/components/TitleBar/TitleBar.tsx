@@ -41,7 +41,7 @@ export function TitleBar() {
       </div>
 
       {/* On macOS the native traffic lights are shown; hide custom controls. */}
-      {process.platform !== 'darwin' && (
+      {typeof process !== 'undefined' && process.platform !== 'darwin' && (
       <div className="flex items-center app-no-drag-region">
         <button
           onClick={handleMinimize}

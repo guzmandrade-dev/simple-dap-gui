@@ -331,11 +331,11 @@ const createWindow = () => {
       nodeIntegration: false,
       sandbox: true,
     },
-    // Use the native menu bar on macOS and a hidden title bar on Windows/Linux.
-    // The custom TitleBar component is kept for Windows/Linux window controls.
-    titleBarStyle: process.platform === 'darwin' ? 'default' : 'hidden',
+    // Use the native title bar on macOS and Windows so system controls are visible by default.
+    // On Linux we keep a hidden title bar and rely on the custom TitleBar for window controls.
+    titleBarStyle: process.platform === 'linux' ? 'hidden' : 'default',
     titleBarOverlay: false,
-    autoHideMenuBar: process.platform !== 'darwin',
+    autoHideMenuBar: process.platform === 'linux',
     show: false,
   });
 
@@ -362,7 +362,8 @@ const createWindow = () => {
 };
 
 // Build the application menu. On macOS this becomes the top menu bar;
-// on Windows/Linux it is shown when Alt is pressed because autoHideMenuBar is enabled.
+// on Linux it is shown when Alt is pressed because autoHideMenuBar is enabled.
+// On Windows the menu bar is visible by default below the native title bar.
 function buildMenu() {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
@@ -915,7 +916,10 @@ ipcMain.handle('search-files', async (_event, query: string) => {
     if (!index) {
       return { success: false, error: 'Search index not ready' };
     }
-    const results = await searchFileNames(index, query);
+    const results = (await searchFileNames(index, query)).map(r => ({
+      ...r,
+      path: path.resolve(index.root, r.path),
+    }));
     return { success: true, results };
   } catch (err) {
     console.error('Failed to search files:', err);
