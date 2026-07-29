@@ -25,7 +25,11 @@ export interface ElectronAPI {
   setWorkspaceRoot: (root: string) => Promise<string>;
   pathResolve: (...paths: string[]) => Promise<string>;
   pathJoin: (...paths: string[]) => Promise<string>;
-  
+
+  // Search
+  searchFiles: (query: string) => Promise<{ success: boolean; error?: string; results?: Array<{ path: string; score: number }> }>;
+  searchContent: (query: string, options?: { caseSensitive?: boolean; regex?: boolean; globs?: string[] }) => Promise<{ success: boolean; error?: string; results?: Array<{ path: string; line: number; text: string }> }>;
+
   // Folder operations
   openFolder: () => Promise<void>;
   onFolderOpened: (callback: (path: string) => void) => () => void;

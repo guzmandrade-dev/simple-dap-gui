@@ -7,6 +7,7 @@ import {
   getFileName,
   getDirectory,
   isAbsolutePath,
+  isPathInside,
 } from './pathMapping';
 
 describe('resolvePathMappings', () => {
@@ -165,5 +166,22 @@ describe('isAbsolutePath', () => {
   it('returns false for relative paths', () => {
     expect(isAbsolutePath('src/index.php')).toBe(false);
     expect(isAbsolutePath('./file.php')).toBe(false);
+  });
+});describe('isPathInside', () => {
+  it('returns true for a path inside the parent', () => {
+    expect(isPathInside('/home/user/project', '/home/user/project/src/index.php')).toBe(true);
+  });
+
+  it('returns true when paths are equal', () => {
+    expect(isPathInside('/home/user/project', '/home/user/project')).toBe(true);
+  });
+
+  it('returns false for a path outside the parent', () => {
+    expect(isPathInside('/home/user/project', '/home/other/file.php')).toBe(false);
+  });
+
+  it('handles Windows paths', () => {
+    expect(isPathInside('C:/project', 'C:/project/src/index.php')).toBe(true);
+    expect(isPathInside('C:/project', 'C:/other/file.php')).toBe(false);
   });
 });

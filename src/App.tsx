@@ -9,6 +9,8 @@ import { FileExplorer } from './components/FileExplorer/FileExplorer';
 import { CodeViewer } from './components/Editor/CodeViewer';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { ResizablePanel } from './components/ResizablePanel/ResizablePanel';
+import { SearchModal } from './components/Search/SearchModal';
+import { isPathInside, normalizePath } from './utils/pathMapping';
 
 const COLLAPSE_THRESHOLD = 120;
 const MIN_EDITOR_WIDTH = 300;
@@ -21,6 +23,7 @@ function App() {
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [isEditorCollapsed, setIsEditorCollapsed] = useState(false);
   const [preCollapseWidths, setPreCollapseWidths] = useState({ explorer: 250, sidebar: 280 });
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const suppressAutoCollapse = useRef(false);
@@ -94,6 +97,26 @@ function App() {
     });
     return unsubscribe;
   }, []);
+
+  // When the debugger stops in a file outside the workspace, clear the current
+  // file instead of trying to open a path that does not exist locally.
+  useEffect(() => {
+    const unsubscribe = useDebugStore.subscribe((state) => {
+      const { workspaceRoot } = useConfigStore.getState();
+      if (!state.currentFile || !workspaceRoot) return;
+
+      const normalizedFile = normalizePath(state.currentFile);
+      const normalizedRoot = normalizePath(workspaceRoot);
+      if (!isPathInside(normalizedRoot, normalizedFile)) {
+        useDebugStore.getState().setCurrentLocation(undefined, undefined, state.currentFrameId);
+        console.warn(
+          `Debugger stopped in a file outside the workspace: ${state.currentFile}. ` +
+          'Open the file manually or check your path mappings.'
+        );
+      }
+    });
+    return unsubscribe;
+  }, []);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input, textarea, or contenteditable
@@ -152,6 +175,20 @@ function App() {
         if (isSessionActive && isPaused) {
           stepInto();
         }
+        return;
+      }
+
+      // Ctrl+P / Cmd+P: Search files
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+        return;
+      }
+
+      // Ctrl+Shift+F / Cmd+Shift+F: Search content
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        setIsSearchOpen(true);
         return;
       }
     };
@@ -294,6 +331,8 @@ function App() {
       </div>
 
       <StatusBar isActive={isSessionActive} />
+
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </div>
   );
 }

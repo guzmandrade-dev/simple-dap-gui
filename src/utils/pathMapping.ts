@@ -1,4 +1,5 @@
 // Path mapping utilities for converting between server and local paths
+import * as path from 'path';
 
 function getPathSeparator(): string {
   if (typeof process !== 'undefined' && process.platform) {
@@ -87,4 +88,12 @@ export function isAbsolutePath(path: string): boolean {
   if (path.startsWith('/')) return true;
   if (/^[a-zA-Z]:/.test(path)) return true; // Windows drive letter
   return false;
+}
+
+export function isPathInside(parent: string, child: string): boolean {
+  const normalizedParent = normalizePath(path.resolve(parent));
+  const normalizedChild = normalizePath(path.resolve(child));
+  if (normalizedParent === normalizedChild) return true;
+  const prefix = normalizedParent.endsWith('/') ? normalizedParent : normalizedParent + '/';
+  return normalizedChild.startsWith(prefix);
 }

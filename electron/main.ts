@@ -7,11 +7,14 @@ import { DebugSession } from '../src/dap/session';
 import { LaunchConfiguration } from '../src/dap/types';
 import { DebugProtocol } from '@vscode/debugprotocol';
 import * as packageJson from '../package.json';
+import { indexFiles, searchFileNames, searchFileContent, SearchIndex } from './search';
 
 // Store reference to main window
 let mainWindow: BrowserWindow | null = null;
 let currentProjectPath: string | null = null;
 let pendingFolderFromSecondInstance: string | null = null;
+let currentSearchIndex: SearchIndex | null = null;
+let searchIndexPromise: Promise<SearchIndex> | null = null;
 
 function getInitialFolderFromArgs(argv: string[]): string | null {
   // Skip executable and app path entries; take the last positional argument.
@@ -41,6 +44,16 @@ function getInitialFolderFromArgs(argv: string[]): string | null {
 
 async function setWorkspaceRoot(folderPath: string): Promise<void> {
   currentProjectPath = folderPath;
+  // Invalidate and rebuild the file search index when the workspace changes
+  currentSearchIndex = null;
+  searchIndexPromise = indexFiles(folderPath).then(index => {
+    currentSearchIndex = index;
+    return index;
+  }).catch(err => {
+    console.error('Failed to build search index:', err);
+    currentSearchIndex = { root: folderPath, files: [], lastUpdated: Date.now() };
+    return currentSearchIndex;
+  });
   if (mainWindow) {
     mainWindow.webContents.send('folder-opened', folderPath);
   }
@@ -767,7 +780,7 @@ ipcMain.handle('read-directory', async (_event, dirPath: string) => {
       path: path.join(dirPath, entry.name),
       isDirectory: entry.isDirectory(),
     }));
-    
+
     // Sort: directories first, then files, both alphabetically
     nodes.sort((a, b) => {
       if (a.isDirectory === b.isDirectory) {
@@ -775,11 +788,45 @@ ipcMain.handle('read-directory', async (_event, dirPath: string) => {
       }
       return a.isDirectory ? -1 : 1;
     });
-    
+
     return nodes;
   } catch (err) {
     console.error('Failed to read directory:', err);
     return [];
+  }
+});
+
+// Search IPC handlers
+ipcMain.handle('search-files', async (_event, query: string) => {
+  try {
+    if (!currentProjectPath) {
+      return { success: false, error: 'No workspace opened' };
+    }
+    if (searchIndexPromise) {
+      await searchIndexPromise;
+    }
+    const index = currentSearchIndex;
+    if (!index) {
+      return { success: false, error: 'Search index not ready' };
+    }
+    const results = await searchFileNames(index, query);
+    return { success: true, results };
+  } catch (err) {
+    console.error('Failed to search files:', err);
+    return { success: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('search-content', async (_event, query: string, options?: { caseSensitive?: boolean; regex?: boolean; globs?: string[] }) => {
+  try {
+    if (!currentProjectPath) {
+      return { success: false, error: 'No workspace opened' };
+    }
+    const results = await searchFileContent(currentProjectPath, query, options || {});
+    return { success: true, results };
+  } catch (err) {
+    console.error('Failed to search content:', err);
+    return { success: false, error: String(err) };
   }
 });
 

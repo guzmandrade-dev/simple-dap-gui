@@ -105,6 +105,7 @@ interface DebugState {
   stepOut: () => Promise<void>;
   pause: () => Promise<void>;
   selectFrame: (frameId: number) => void;
+  setCurrentLocation: (file: string | undefined, line: number | undefined, frameId?: number) => void;
 
   // Event handlers
   onStopped: (body: DebugProtocol.StoppedEvent['body']) => void;
@@ -249,9 +250,10 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
     // Update current location from top frame
     if (body.stackFrames.length > 0) {
       const topFrame = body.stackFrames[0];
-      
+      const framePath = topFrame.source?.path || '';
+
       // Convert server path to local path via IPC
-      window.electronAPI.pathResolve(topFrame.source?.path || '').then(localPath => {
+      window.electronAPI.pathResolve(framePath).then(localPath => {
         set({
           currentFile: localPath,
           currentLine: topFrame.line,
@@ -411,6 +413,14 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
     } else {
       set({ currentFrameId: frameId });
     }
+  },
+
+  setCurrentLocation: (file: string | undefined, line: number | undefined, frameId?: number) => {
+    set({
+      currentFile: file,
+      currentLine: line,
+      currentFrameId: frameId,
+    });
   },
 
   setBreakpoint: async (file: string, line: number) => {

@@ -7,9 +7,10 @@ interface EditorState {
   fileContents: Map<string, string>;
   
   // Actions
-  openFile: (path: string) => Promise<void>;
+  openFile: (path: string, line?: number) => Promise<void>;
   closeFile: (path: string) => void;
   setCurrentFile: (path: string | undefined) => void;
+  setCurrentLine: (line: number | undefined) => void;
   getFileContent: (path: string) => string | undefined;
   isFileOpen: (path: string) => boolean;
   reloadFile: (path: string) => Promise<void>;
@@ -22,21 +23,22 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
   openFiles: [],
   fileContents: new Map(),
 
-  openFile: async (path: string) => {
+  openFile: async (path: string, line?: number) => {
     const { openFiles, fileContents } = get();
-    
+
     // Always reload content from disk so external edits are picked up
     try {
       if (window.electronAPI) {
         const content = await window.electronAPI.readFile(path);
         fileContents.set(path, content);
-        
+
         // Add to openFiles only if not already there
         const newOpenFiles = openFiles.includes(path) ? openFiles : [...openFiles, path];
-        
+
         set({
           openFiles: newOpenFiles,
           currentFile: path,
+          currentLine: line,
           fileContents: new Map(fileContents),
         });
       }
@@ -82,6 +84,10 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   setCurrentFile: (path: string | undefined) => {
     set({ currentFile: path });
+  },
+
+  setCurrentLine: (line: number | undefined) => {
+    set({ currentLine: line });
   },
 
   getFileContent: (path: string) => {
