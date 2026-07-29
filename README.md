@@ -198,6 +198,19 @@ npm run dev
 | **Shift + F11** | Step Out |
 | *Toolbar* | Disconnect (detach without killing the process) |
 
+## Changelog
+
+### 0.4.6
+
+- **File & Content Search**: Added a search modal (`Ctrl+P` / `Ctrl+Shift+F`) with fuzzy file-name search powered by `fuzzysort` and fast content search powered by `ripgrep`, with a pure-JavaScript fallback when `rg` is not installed.
+- **Native Application Menu**: Restored the native menu bar so the window can be closed via the menu on all platforms, and macOS no longer overlaps the custom title bar with the system one.
+- **Windows Title Bar**: Native window controls are now shown by default on Windows instead of being hidden.
+- **Debug Stop Outside Workspace**: Added a guard when the debugger stops on a file outside the current project folder.
+- **Current Line Highlight**: The active line is now highlighted in both the gutter and the code view. Clicking a line sets the current line and highlights it without scrolling.
+- **Jump to Line from Search**: Clicking a content search result opens the file and jumps to the matched line.
+- **Theme Readability**: Improved the search modal and current-line highlight contrast in the light theme.
+- **Removed `ripgrep-js` dependency**: Replaced the buggy wrapper with a custom `execFile`-based implementation.
+
 ## Panels
 
 ### Variables
