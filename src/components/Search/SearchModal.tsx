@@ -195,9 +195,9 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center pt-24 bg-black/40 dark:bg-black/60 backdrop-blur-sm">
-      <div className="bg-bg-secondary border border-border shadow-2xl w-full max-w-2xl mx-4 rounded-xl overflow-hidden flex flex-col max-h-[80vh]">
+      <div className="bg-panel border border-border shadow-2xl w-full max-w-2xl mx-4 rounded-xl overflow-hidden flex flex-col max-h-[80vh]">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border-subtle bg-bg-tertiary">
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border-subtle bg-elevated">
           <IconSearch className="text-text-secondary" />
           <input
             ref={inputRef}
@@ -210,7 +210,7 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
           />
           <button
             onClick={onClose}
-            className="text-text-secondary hover:text-text p-1.5 rounded hover:bg-bg-hover transition-colors"
+            className="text-text-secondary hover:text-text p-1.5 rounded hover:bg-hover transition-colors"
             title="Close (Esc)"
             aria-label="Close search"
           >
@@ -219,13 +219,13 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
         </div>
 
         {/* Mode tabs */}
-        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border-subtle bg-bg-secondary">
+        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border-subtle bg-panel">
           <button
             onClick={() => setMode('files')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
               mode === 'files'
                 ? 'bg-accent text-accent-text shadow-sm'
-                : 'text-text-secondary hover:text-text hover:bg-bg-tertiary'
+                : 'text-text-secondary hover:text-text hover:bg-elevated'
             }`}
           >
             <IconFile />
@@ -236,7 +236,7 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
               mode === 'content'
                 ? 'bg-accent text-accent-text shadow-sm'
-                : 'text-text-secondary hover:text-text hover:bg-bg-tertiary'
+                : 'text-text-secondary hover:text-text hover:bg-elevated'
             }`}
           >
             <IconText />
@@ -248,7 +248,7 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
         </div>
 
         {/* Results */}
-        <div ref={listRef} className="flex-1 overflow-auto min-h-0 bg-bg-secondary">
+        <div ref={listRef} className="flex-1 overflow-auto min-h-0 bg-panel">
           {error && (
             <div className="p-4 text-danger text-sm">
               {error}
@@ -278,7 +278,7 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
                   onClick={() => handleSelect(index)}
                   onMouseEnter={() => setSelectedIndex(index)}
                   className={`px-4 py-2.5 cursor-pointer flex items-center gap-3 border-b border-border-subtle last:border-b-0 ${
-                    isSelected ? 'bg-accent text-accent-text' : 'text-text hover:bg-bg-hover'
+                    isSelected ? 'bg-accent text-accent-text' : 'text-text hover:bg-hover'
                   }`}
                 >
                   <IconFile className={isSelected ? 'text-accent-text' : 'text-text-secondary'} />
@@ -300,7 +300,7 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
                 onClick={() => handleSelect(index)}
                 onMouseEnter={() => setSelectedIndex(index)}
                 className={`px-4 py-2.5 cursor-pointer flex items-start gap-3 border-b border-border-subtle last:border-b-0 ${
-                  isSelected ? 'bg-accent text-accent-text' : 'text-text hover:bg-bg-hover'
+                  isSelected ? 'bg-accent text-accent-text' : 'text-text hover:bg-hover'
                 }`}
               >
                 <IconText className={isSelected ? 'text-accent-text mt-0.5' : 'text-text-secondary mt-0.5'} />
@@ -319,7 +319,7 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-2.5 border-t border-border-subtle bg-bg-tertiary text-xs text-text-muted flex items-center justify-between">
+        <div className="px-4 py-2.5 border-t border-border-subtle bg-elevated text-xs text-text-muted flex items-center justify-between">
           <span>↑↓ to navigate · Enter to open · Esc to close</span>
           <span>Powered by fuzzysort / ripgrep</span>
         </div>

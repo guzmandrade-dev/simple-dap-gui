@@ -231,7 +231,7 @@ export function SettingsPanel() {
             <textarea
               value={settings.globalLaunchConfigJson}
               onChange={(e) => setSettings({ ...settings, globalLaunchConfigJson: e.target.value })}
-              className="w-full font-mono text-xs"
+              className="w-full font-mono text-xs bg-elevated text-text border border-border rounded p-2 resize-y"
               rows={8}
               placeholder={`{\n  \"configurations\": [\n    {\n      \"name\": \"Global PHP Listen\",\n      \"type\": \"php\",\n      \"request\": \"launch\",\n      \"port\": 9003\n    }\n  ]\n}`}
             />

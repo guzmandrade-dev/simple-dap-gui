@@ -1,14 +1,20 @@
+# Created with WinGet Releaser using komac v2.16.0
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+
 PackageIdentifier: guzmandrade-dev.simple-dap-gui
-PackageVersion: 0.4.2
+PackageVersion: 0.4.6
+InstallerLocale: en-US
 Platform:
   - Windows.Desktop
 MinimumOSVersion: 10.0.0.0
 InstallerType: portable
 UpgradeBehavior: install
-ReleaseDate: 2026-06-28
+ReleaseDate: 2026-07-29
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/guzmandrade-dev/simple-dap-gui/releases/download/v0.4.2/simple-dap-gui-0.4.2.exe
-    InstallerSha256: A10C8953E01B0663F300776CF47D8B6CF315FD4BA18037A76B5E35C942C8A23D
+    InstallerUrl: https://github.com/guzmandrade-dev/simple-dap-gui/releases/download/v0.4.6/simple-dap-gui.0.4.6.exe
+    InstallerSha256: 51B98793180125ED95766E6543496D25AF86622585159CD26B62380DC7964447
+Commands:
+  - simple-dap-gui
 ManifestType: installer
-ManifestVersion: 1.6.0
+ManifestVersion: 1.12.0
