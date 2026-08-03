@@ -200,6 +200,12 @@ npm run dev
 
 ## Changelog
 
+### 0.4.7
+
+- **Winget Command Shim**: Added `Commands:` to the winget installer manifest so the portable package exposes `simple-dap-gui` on PATH after installation.
+- **Search Modal Theme**: Fixed the search modal background in the light theme so it no longer appears transparent over the backdrop.
+- **Settings JSON Readability**: Fixed the Global Launch Configurations textarea colors in dark mode so the JSON text is readable.
+
 ### 0.4.6
 
 - **File & Content Search**: Added a search modal (`Ctrl+P` / `Ctrl+Shift+F`) with fuzzy file-name search powered by `fuzzysort` and fast content search powered by `ripgrep`, with a pure-JavaScript fallback when `rg` is not installed.
