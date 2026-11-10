@@ -19,11 +19,15 @@ export interface SearchIndex {
   lastUpdated: number;
 }
 
-const IGNORED_DIRS = new Set([
+export const IGNORED_DIRS = new Set([
   '.git', '.svn', '.hg', 'node_modules', 'vendor', 'dist', 'build', 'out',
   '.next', '.nuxt', 'coverage', '.cache', '.turbo', '.vscode', '.idea',
   '__pycache__', '.pytest_cache', 'target', 'Debug', 'Release', 'obj',
 ]);
+
+// Safety cap so opening a huge tree (or a filesystem root) cannot hang the
+// indexer forever.
+const MAX_INDEXED_FILES = 100_000;
 
 const BINARY_EXTENSIONS = new Set([
   'exe', 'dll', 'so', 'dylib', 'bin', 'obj', 'o',
@@ -53,6 +57,10 @@ export async function indexFiles(rootPath: string): Promise<SearchIndex> {
   const files: string[] = [];
   for await (const filePath of walkDirectory(rootPath)) {
     files.push(filePath);
+    if (files.length >= MAX_INDEXED_FILES) {
+      console.warn(`Search index capped at ${MAX_INDEXED_FILES} files under ${rootPath}`);
+      break;
+    }
   }
   return {
     root: rootPath,
@@ -70,13 +78,18 @@ export async function searchFileNames(
   }
 
   const { default: fuzzysort } = await import('fuzzysort');
-  const results = fuzzysort.go(query, index.files, {
+
+  // Match against workspace-relative paths (like editors do) so the root
+  // prefix doesn't dominate the fuzzy score; resolve back to absolute on
+  // return.
+  const relativeFiles = index.files.map(f => path.relative(index.root, f));
+  const results = fuzzysort.go(query, relativeFiles, {
     threshold: -10000,
     limit: 100,
   });
 
   return results.map(result => ({
-    path: result.target,
+    path: path.resolve(index.root, result.target),
     score: result.score,
   }));
 }
@@ -188,10 +201,11 @@ async function runRipgrepSearch(
   });
 }
 
-async function runJsContentSearch(
+// Exported for unit tests.
+export async function runJsContentSearch(
   rootPath: string,
   query: string,
-  options: { caseSensitive?: boolean; regex?: boolean; globs?: string[] }
+  options: { caseSensitive?: boolean; regex?: boolean; globs?: string[] } = {}
 ): Promise<ContentSearchResult[]> {
   const results: ContentSearchResult[] = [];
   const maxResults = 200;

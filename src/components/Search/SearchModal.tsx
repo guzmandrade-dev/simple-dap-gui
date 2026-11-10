@@ -58,6 +58,8 @@ function IconClose({ className }: { className?: string }) {
 export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchModalProps) {
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<SearchMode>(initialMode);
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [useRegex, setUseRegex] = useState(false);
   const [fileResults, setFileResults] = useState<SearchFileResult[]>([]);
   const [contentResults, setContentResults] = useState<SearchContentResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -106,7 +108,10 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
           setContentResults([]);
         }
       } else {
-        const response = await window.electronAPI?.searchContent(searchQuery);
+        const response = await window.electronAPI?.searchContent(searchQuery, {
+          caseSensitive,
+          regex: useRegex,
+        });
         if (response?.success && response.results) {
           setContentResults(response.results);
           setFileResults([]);
@@ -123,7 +128,7 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [caseSensitive, useRegex]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -143,7 +148,7 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
         clearTimeout(debounceRef.current);
       }
     };
-  }, [query, mode, isOpen, performSearch]);
+  }, [query, mode, caseSensitive, useRegex, isOpen, performSearch]);
 
   const allResults = useMemo(() => {
     return mode === 'files'
@@ -242,6 +247,32 @@ export function SearchModal({ isOpen, initialMode = 'files', onClose }: SearchMo
             <IconText />
             <span>Content</span>
           </button>
+          {mode === 'content' && (
+            <div className="flex items-center gap-1 ml-2">
+              <button
+                onClick={() => setCaseSensitive(v => !v)}
+                className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                  caseSensitive
+                    ? 'bg-accent text-accent-text shadow-sm'
+                    : 'text-text-secondary hover:text-text hover:bg-elevated'
+                }`}
+                title="Case sensitive"
+              >
+                Aa
+              </button>
+              <button
+                onClick={() => setUseRegex(v => !v)}
+                className={`px-2 py-1 rounded-md text-xs font-medium transition-colors font-mono ${
+                  useRegex
+                    ? 'bg-accent text-accent-text shadow-sm'
+                    : 'text-text-secondary hover:text-text hover:bg-elevated'
+                }`}
+                title="Use regular expression"
+              >
+                .*
+              </button>
+            </div>
+          )}
           <span className="ml-auto text-xs text-text-muted">
             {isLoading ? 'Searching...' : `${allResults.length} result${allResults.length !== 1 ? 's' : ''}`}
           </span>

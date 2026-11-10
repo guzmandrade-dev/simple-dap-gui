@@ -5,8 +5,9 @@ import { BreakpointsPanel } from './BreakpointsPanel';
 import { AdapterManagerPanel } from './AdapterManagerPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { WatchPanel } from './WatchPanel';
+import { OutputPanel } from './OutputPanel';
 
-type Tab = 'stack' | 'variables' | 'watch' | 'breakpoints' | 'adapters' | 'settings';
+type Tab = 'stack' | 'variables' | 'watch' | 'breakpoints' | 'console' | 'adapters' | 'settings';
 
 interface SidebarProps {
   className?: string;
@@ -61,6 +62,16 @@ function IconAdapters({ className }: { className?: string }) {
   );
 }
 
+function IconConsole({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
+      <path d="M5 6l2 2-2 2" />
+      <path d="M8.5 10.5H11" />
+    </svg>
+  );
+}
+
 function IconSettings({ className }: { className?: string }) {
   return (
     <svg className={className} width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -75,6 +86,7 @@ const tabs = [
   { id: 'variables' as Tab, label: 'Vars', icon: IconVariables, title: 'Variables' },
   { id: 'watch' as Tab, label: 'Watch', icon: IconWatch, title: 'Watch' },
   { id: 'breakpoints' as Tab, label: 'Breakpoints', icon: IconBreakpoint, title: 'Breakpoints' },
+  { id: 'console' as Tab, label: 'Console', icon: IconConsole, title: 'Console Output' },
   { id: 'adapters' as Tab, label: 'Adapters', icon: IconAdapters, title: 'Debug Adapters' },
   { id: 'settings' as Tab, label: 'Settings', icon: IconSettings, title: 'Settings' },
 ];
@@ -111,6 +123,7 @@ export function Sidebar({ className }: SidebarProps) {
         {activeTab === 'variables' && <VariablesPanel />}
         {activeTab === 'watch' && <WatchPanel />}
         {activeTab === 'breakpoints' && <BreakpointsPanel />}
+        {activeTab === 'console' && <OutputPanel />}
         {activeTab === 'adapters' && <AdapterManagerPanel />}
         {activeTab === 'settings' && <SettingsPanel />}
       </div>
