@@ -12,6 +12,7 @@ npm run build:renderer   # tsc --noEmit && vite build (renderer + electron bundl
 npm run build            # + electron-builder packaging (downloads Electron dist)
 ```
 
+- **Node >= 22.22.2 / 24.15+ / 26+ is required** (declared in `package.json` `engines`): vitest 5 needs Node >= 22.12 and jsdom 31's bundled undici crashes on Node 20 (`Cannot read properties of undefined (reading 'bind')` in `undici/lib/interceptor/decompress.js`). CI therefore runs on `node-version: 24` (Node 20 runners are deprecated by GitHub anyway). Verified: 111/111 tests pass on Node 24.22.2 and Node 26.
 - Config for ESLint lives in `.eslintrc.cjs` (ESLint 8, eslintrc format — do not migrate to flat config without upgrading ESLint).
 - `vite build` prints a benign `Unknown input options: platform` warning from vite-plugin-electron v1 internals — ignore it.
 - In sandboxes where npm blocks install scripts, `electron`'s postinstall (binary download) may be skipped; builds/tests still work, but `npm run dev` / packaging need the binary (`npm approve-scripts` or run install with scripts allowed).
