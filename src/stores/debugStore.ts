@@ -1,8 +1,14 @@
 import { create } from 'zustand';
 import { DebugProtocol } from '@vscode/debugprotocol';
 import { LaunchConfiguration } from '../dap/types';
+import { useEditorStore } from './editorStore';
+import { classifyStopSource, virtualSourceKey, MAX_OUTPUT_LINES } from '../utils/debugNavigation';
 
 const BREAKPOINTS_FILENAME = '.vscode/dap-gui.breakpoints.json';
+
+// Guards against double listener registration (React StrictMode runs
+// effects twice in development, which would duplicate DAP event handlers).
+let dapListenersRegistered = false;
 
 async function getBreakpointsPath(): Promise<string | null> {
   if (!window.electronAPI) return null;
@@ -63,10 +69,24 @@ async function saveBreakpoints(breakpoints: Map<string, Set<number>>): Promise<v
   }
 }
 
+export interface SourceUnavailableInfo {
+  name?: string;
+  path?: string;
+  sourceReference?: number;
+  error?: string;
+}
+
+export interface OutputEntry {
+  text: string;
+  category?: string;
+}
+
 interface DebugState {
   // Session state
   isSessionActive: boolean;
   isPaused: boolean;
+  stopReason: string | undefined;
+  stopDescription: string | undefined;
 
   // Data from DAP
   threads: DebugProtocol.Thread[];
@@ -74,11 +94,19 @@ interface DebugState {
   scopes: DebugProtocol.Scope[];
   variables: Map<number, DebugProtocol.Variable[]>;
 
+  // Console output from the debuggee
+  output: OutputEntry[];
+
   // Current position
   currentThreadId: number | undefined;
   currentFrameId: number | undefined;
   currentFile: string | undefined;
   currentLine: number | undefined;
+
+  // Set when the stopped frame's source is not available as a local file.
+  // The session stays alive in that case; the editor shows an explanatory
+  // panel instead of crashing or going blank.
+  currentSourceUnavailable: SourceUnavailableInfo | null;
 
   // Breakpoints
   breakpoints: Map<string, Set<number>>;
@@ -109,11 +137,17 @@ interface DebugState {
 
   // Event handlers
   onStopped: (body: DebugProtocol.StoppedEvent['body']) => void;
-  onStackTrace: (body: DebugProtocol.StackTraceResponse['body']) => void;
+  onStackTrace: (body: DebugProtocol.StackTraceResponse['body']) => Promise<void>;
   onScopes: (body: DebugProtocol.ScopesResponse['body']) => void;
   onVariables: (data: { frameId: number; scopeId: number; variables: DebugProtocol.Variable[] }) => void;
   onChildVariables: (data: { variablesReference: number; variables: DebugProtocol.Variable[] }) => void;
+  onOutput: (body: DebugProtocol.OutputEvent['body']) => void;
+  clearOutput: () => void;
   fetchChildVariables: (variablesReference: number) => Promise<void>;
+
+  // Navigation to a stack frame; handles sources that are not local files
+  navigateToFrame: (frame: DebugProtocol.StackFrame) => Promise<void>;
+  fetchAndOpenAdapterSource: (sourceReference: number, name?: string, line?: number, path?: string) => Promise<void>;
 
   // Watch management
   addWatch: (expression: string) => void;
@@ -134,65 +168,86 @@ interface DebugState {
   isExceptionBreakpointEnabled: (filter: string) => boolean;
 }
 
+function resetSessionState() {
+  return {
+    isSessionActive: false,
+    isPaused: false,
+    stopReason: undefined,
+    stopDescription: undefined,
+    threads: [] as DebugProtocol.Thread[],
+    stackFrames: [] as DebugProtocol.StackFrame[],
+    scopes: [] as DebugProtocol.Scope[],
+    variables: new Map<number, DebugProtocol.Variable[]>(),
+    currentThreadId: undefined,
+    currentFrameId: undefined,
+    currentFile: undefined,
+    currentLine: undefined,
+    currentSourceUnavailable: null,
+  };
+}
+
 export const useDebugStore = create<DebugState>()((set, get) => ({
   // Initial state
+  ...resetSessionState(),
   isSessionActive: false,
-  isPaused: false,
-  threads: [],
-  stackFrames: [],
-  scopes: [],
-  variables: new Map(),
-  currentThreadId: undefined,
-  currentFrameId: undefined,
-  currentFile: undefined,
-  currentLine: undefined,
   breakpoints: new Map(),
   breakpointVerified: new Map(),
   exceptionBreakpoints: new Map(),
   workspaceRoot: '',
   recentConfigs: [],
   watches: [],
+  output: [],
 
   initialize: async () => {
     // Get workspace root from Electron
     if (window.electronAPI) {
       const root = await window.electronAPI.getWorkspaceRoot();
       set({ workspaceRoot: root });
-      
+
       // Load persisted breakpoints
       const loaded = await loadBreakpoints();
       if (loaded.size > 0) {
         set({ breakpoints: loaded });
       }
-      
-      // Setup DAP event listeners
-      window.electronAPI.onDapStopped((event) => {
-        get().onStopped(event as DebugProtocol.StoppedEvent['body']);
-      });
-    
-      window.electronAPI.onDapStackTrace((body) => {
-        get().onStackTrace(body as DebugProtocol.StackTraceResponse['body']);
-      });
-    
-      window.electronAPI.onDapScopes((body) => {
-        get().onScopes(body as DebugProtocol.ScopesResponse['body']);
-      });
-    
-      window.electronAPI.onDapVariables((data) => {
-        get().onVariables(data as { frameId: number; scopeId: number; variables: DebugProtocol.Variable[] });
-      });
-    
-      window.electronAPI.onDapChildVariables((data) => {
-        get().onChildVariables(data as { variablesReference: number; variables: DebugProtocol.Variable[] });
-      });
-      
-      window.electronAPI.onDapTerminated(() => {
-        get().stopSession();
-      });
-      
-      window.electronAPI.onDapExited(() => {
-        get().stopSession();
-      });
+
+      // Setup DAP event listeners (once — StrictMode double-invokes effects)
+      if (!dapListenersRegistered) {
+        dapListenersRegistered = true;
+
+        window.electronAPI.onDapStopped((event) => {
+          get().onStopped(event as DebugProtocol.StoppedEvent['body']);
+        });
+
+        window.electronAPI.onDapStackTrace((body) => {
+          get().onStackTrace(body as DebugProtocol.StackTraceResponse['body']).catch((err) => {
+            console.error('Error handling stack trace:', err);
+          });
+        });
+
+        window.electronAPI.onDapScopes((body) => {
+          get().onScopes(body as DebugProtocol.ScopesResponse['body']);
+        });
+
+        window.electronAPI.onDapVariables((data) => {
+          get().onVariables(data as { frameId: number; scopeId: number; variables: DebugProtocol.Variable[] });
+        });
+
+        window.electronAPI.onDapChildVariables((data) => {
+          get().onChildVariables(data as { variablesReference: number; variables: DebugProtocol.Variable[] });
+        });
+
+        window.electronAPI.onDapOutput((body) => {
+          get().onOutput(body as DebugProtocol.OutputEvent['body']);
+        });
+
+        window.electronAPI.onDapTerminated(() => {
+          get().stopSession();
+        });
+
+        window.electronAPI.onDapExited(() => {
+          get().stopSession();
+        });
+      }
     }
   },
 
@@ -207,19 +262,11 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
 
       const initialExceptionFilters = Array.from(get().exceptionBreakpoints.keys());
       const result = await window.electronAPI?.debugStart(config as unknown as Record<string, unknown>, initialBreakpoints, initialExceptionFilters);
-      
+
       if (result?.success) {
-        set({ 
+        set({
+          ...resetSessionState(),
           isSessionActive: true,
-          isPaused: false,
-          threads: [],
-          stackFrames: [],
-          scopes: [],
-          variables: new Map(),
-          currentThreadId: undefined,
-          currentFrameId: undefined,
-          currentFile: undefined,
-          currentLine: undefined,
         });
 
         // Add to recent configs
@@ -241,26 +288,118 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
     set({
       isPaused: true,
       currentThreadId: body.threadId,
+      stopReason: body.reason,
+      stopDescription: body.text ?? body.description,
+      currentSourceUnavailable: null,
     });
   },
 
-  onStackTrace: (body) => {
+  onStackTrace: async (body) => {
     set({ stackFrames: body.stackFrames });
 
     // Update current location from top frame
     if (body.stackFrames.length > 0) {
-      const topFrame = body.stackFrames[0];
-      const framePath = topFrame.source?.path || '';
+      await get().navigateToFrame(body.stackFrames[0]);
+    }
+  },
 
-      // Convert server path to local path via IPC
-      window.electronAPI.pathResolve(framePath).then(localPath => {
+  navigateToFrame: async (frame) => {
+    const source = frame.source;
+    const rawPath = source?.path?.trim() || '';
+
+    // Normalize the adapter-reported path to a local absolute path.
+    let resolvedPath = rawPath;
+    if (rawPath && window.electronAPI) {
+      try {
+        resolvedPath = await window.electronAPI.pathResolve(rawPath);
+      } catch {
+        resolvedPath = rawPath;
+      }
+    }
+
+    // Only treat the path as a local file when it actually exists on disk.
+    // A stop in a file outside the project (or on a remote server) must not
+    // break the session — we fall back to adapter-provided source or an
+    // explanatory panel instead.
+    let fileExists = false;
+    if (resolvedPath && window.electronAPI) {
+      try {
+        fileExists = await window.electronAPI.fileExists(resolvedPath);
+      } catch {
+        fileExists = false;
+      }
+    }
+
+    const stopSource = classifyStopSource({
+      path: resolvedPath || undefined,
+      name: source?.name,
+      sourceReference: source?.sourceReference,
+      fileExists,
+    });
+
+    if (stopSource.kind === 'file') {
+      set({
+        currentFile: stopSource.path,
+        currentLine: frame.line,
+        currentFrameId: frame.id,
+        currentSourceUnavailable: null,
+      });
+      await useEditorStore.getState().openFile(stopSource.path, frame.line);
+    } else if (stopSource.kind === 'adapter') {
+      set({
+        currentFile: undefined,
+        currentLine: frame.line,
+        currentFrameId: frame.id,
+        currentSourceUnavailable: {
+          name: stopSource.name ?? source?.name,
+          path: stopSource.path,
+          sourceReference: stopSource.sourceReference,
+        },
+      });
+      // Try to pull the source content straight from the adapter so the
+      // user still sees the code where the debugger stopped.
+      await get().fetchAndOpenAdapterSource(stopSource.sourceReference, stopSource.name ?? source?.name, frame.line, stopSource.path);
+    } else {
+      set({
+        currentFile: undefined,
+        currentLine: frame.line,
+        currentFrameId: frame.id,
+        currentSourceUnavailable: {
+          name: source?.name,
+          path: stopSource.path,
+        },
+      });
+    }
+
+    // Re-evaluate watches for the new frame
+    get().evaluateWatches();
+  },
+
+  fetchAndOpenAdapterSource: async (sourceReference, name, line, path) => {
+    try {
+      const result = await window.electronAPI?.debugFetchSource(sourceReference);
+      if (result?.success && typeof result.content === 'string' && result.content.length > 0) {
+        const key = virtualSourceKey(sourceReference, name);
+        useEditorStore.getState().setVirtualContent(key, result.content, line);
+        set({ currentFile: key, currentSourceUnavailable: null });
+      } else {
         set({
-          currentFile: localPath,
-          currentLine: topFrame.line,
-          currentFrameId: topFrame.id,
+          currentSourceUnavailable: {
+            name,
+            path,
+            sourceReference,
+            error: result?.error || 'The adapter did not return source content for this frame.',
+          },
         });
-        // Re-evaluate watches for the new frame
-        get().evaluateWatches();
+      }
+    } catch (err) {
+      set({
+        currentSourceUnavailable: {
+          name,
+          path,
+          sourceReference,
+          error: err instanceof Error ? err.message : String(err),
+        },
       });
     }
   },
@@ -281,6 +420,17 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
     const { variables } = get();
     variables.set(data.variablesReference, data.variables);
     set({ variables: new Map(variables) });
+  },
+
+  onOutput: (body) => {
+    if (!body || typeof body.output !== 'string') return;
+    const entry: OutputEntry = { text: body.output, category: body.category };
+    const output = [...get().output, entry];
+    set({ output: output.length > MAX_OUTPUT_LINES ? output.slice(output.length - MAX_OUTPUT_LINES) : output });
+  },
+
+  clearOutput: () => {
+    set({ output: [] });
   },
 
   fetchChildVariables: async (variablesReference) => {
@@ -347,39 +497,17 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
 
   stopSession: async () => {
     await window.electronAPI?.debugStop();
-    set({
-      isSessionActive: false,
-      isPaused: false,
-      threads: [],
-      stackFrames: [],
-      scopes: [],
-      variables: new Map(),
-      currentThreadId: undefined,
-      currentFrameId: undefined,
-      currentFile: undefined,
-      currentLine: undefined,
-    });
+    set(resetSessionState());
   },
 
   detachSession: async () => {
     await window.electronAPI?.debugDetach();
-    set({
-      isSessionActive: false,
-      isPaused: false,
-      threads: [],
-      stackFrames: [],
-      scopes: [],
-      variables: new Map(),
-      currentThreadId: undefined,
-      currentFrameId: undefined,
-      currentFile: undefined,
-      currentLine: undefined,
-    });
+    set(resetSessionState());
   },
 
   continue: async () => {
     await window.electronAPI?.debugContinue();
-    set({ isPaused: false });
+    set({ isPaused: false, stopReason: undefined, stopDescription: undefined, currentSourceUnavailable: null });
   },
 
   stepOver: async () => {
@@ -400,18 +528,10 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
 
   selectFrame: (frameId: number) => {
     const frame = get().stackFrames.find(f => f.id === frameId);
-    if (frame?.source?.path) {
-      window.electronAPI.pathResolve(frame.source.path).then(localPath => {
-        set({
-          currentFrameId: frameId,
-          currentFile: localPath,
-          currentLine: frame.line,
-        });
-        // Re-evaluate watches for the new frame
-        get().evaluateWatches();
+    if (frame) {
+      get().navigateToFrame(frame).catch((err) => {
+        console.error('Error navigating to frame:', err);
       });
-    } else {
-      set({ currentFrameId: frameId });
     }
   },
 
@@ -437,7 +557,7 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
     verified.set(file, fileVerified);
 
     set({ breakpoints, breakpointVerified: verified });
-    
+
     // Persist to disk
     await saveBreakpoints(breakpoints);
 
@@ -467,7 +587,7 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
     }
 
     set({ breakpoints, breakpointVerified: verified });
-    
+
     // Persist to disk
     await saveBreakpoints(breakpoints);
 

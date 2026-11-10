@@ -7,7 +7,13 @@ import { DebugSession } from '../src/dap/session';
 import { LaunchConfiguration } from '../src/dap/types';
 import { DebugProtocol } from '@vscode/debugprotocol';
 import * as packageJson from '../package.json';
-import { indexFiles, searchFileNames, searchFileContent, SearchIndex } from './search';
+import { indexFiles, searchFileNames, searchFileContent, SearchIndex, IGNORED_DIRS } from './search';
+
+// A debug adapter hiccup must never take down the whole app: log unhandled
+// rejections instead of letting Node crash the main process.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection in main process:', reason);
+});
 
 // Store reference to main window
 let mainWindow: BrowserWindow | null = null;
@@ -150,6 +156,12 @@ class DebugSessionManager {
   private session: DebugSession | null = null;
 
   async start(config: LaunchConfiguration, initialBreakpoints?: Map<string, number[]>, initialExceptionFilters?: string[]): Promise<void> {
+    // Never leave a previous adapter process running when restarting.
+    if (this.session) {
+      await this.session.disconnect().catch(() => {});
+      this.session = null;
+    }
+
     const workspaceRoot = currentProjectPath || process.cwd();
     this.session = new DebugSession(config, workspaceRoot);
 
@@ -232,6 +244,16 @@ class DebugSessionManager {
     return this.session.evaluate(expression, frameId);
   }
 
+  async fetchSource(sourceReference: number): Promise<{ content: string; mimeType?: string } | null> {
+    if (!this.session) return null;
+    try {
+      return await this.session.fetchSource(sourceReference);
+    } catch (error) {
+      console.error('Failed to fetch source from adapter:', error);
+      return null;
+    }
+  }
+
   isActive(): boolean {
     return this.session !== null;
   }
@@ -302,6 +324,18 @@ class DebugSessionManager {
 
     this.session.client.on('childVariables', (data: { variablesReference: number; variables: DebugProtocol.Variable[] }) => {
       mainWindow?.webContents.send('dap-child-variables', data);
+    });
+
+    // Forward debuggee console output so it can be shown in the UI
+    this.session.client.on('output', (body: DebugProtocol.OutputEvent['body']) => {
+      mainWindow?.webContents.send('dap-output', body);
+    });
+
+    // If the adapter process dies unexpectedly, tell the renderer so the
+    // session does not appear alive while it is not.
+    this.session.client.on('closed', () => {
+      mainWindow?.webContents.send('dap-terminated');
+      this.session = null;
     });
 
     this.session.client.on('terminated', () => {
@@ -567,7 +601,7 @@ async function downloadFile(
   const chunks: Buffer[] = [];
   let downloaded = 0;
 
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
 
@@ -878,15 +912,17 @@ ipcMain.handle('path-join', (_event, ...paths: string[]) => {
   return path.join(...paths);
 });
 
-// Read directory contents
+// Read directory contents (skips heavy VCS/dependency dirs for a fast tree)
 ipcMain.handle('read-directory', async (_event, dirPath: string) => {
   try {
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
-    const nodes = entries.map(entry => ({
-      name: entry.name,
-      path: path.join(dirPath, entry.name),
-      isDirectory: entry.isDirectory(),
-    }));
+    const nodes = entries
+      .filter(entry => !(entry.isDirectory() && IGNORED_DIRS.has(entry.name)))
+      .map(entry => ({
+        name: entry.name,
+        path: path.join(dirPath, entry.name),
+        isDirectory: entry.isDirectory(),
+      }));
 
     // Sort: directories first, then files, both alphabetically
     nodes.sort((a, b) => {
@@ -1030,6 +1066,18 @@ ipcMain.handle('debug-evaluate', async (_event, expression: string, frameId?: nu
   return { success: !!result, result };
 });
 
+ipcMain.handle('debug-source', async (_event, sourceReference: number) => {
+  try {
+    const result = await debugManager.fetchSource(sourceReference);
+    if (!result) {
+      return { success: false, error: 'No active session or adapter did not return source' };
+    }
+    return { success: true, content: result.content, mimeType: result.mimeType };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});
+
 ipcMain.handle('debug-is-active', () => {
   return debugManager.isActive();
 });
@@ -1124,7 +1172,7 @@ ipcMain.handle('install-adapter', async (_event, adapterId: string): Promise<Ada
     try {
       await fs.rm(installPath, { recursive: true, force: true });
       await fs.unlink(vsixPath).catch(() => {});
-    } catch {}
+    } catch { /* best-effort cleanup */ }
     throw error;
   }
 });
@@ -1235,7 +1283,7 @@ ipcMain.handle('install-custom-adapter', async (): Promise<AdapterInfo> => {
   } catch (error) {
     try {
       await fs.rm(installPath, { recursive: true, force: true });
-    } catch {}
+    } catch { /* best-effort cleanup */ }
     throw error;
   }
 });

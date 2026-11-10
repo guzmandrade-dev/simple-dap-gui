@@ -10,7 +10,6 @@ import { CodeViewer } from './components/Editor/CodeViewer';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { ResizablePanel } from './components/ResizablePanel/ResizablePanel';
 import { SearchModal } from './components/Search/SearchModal';
-import { isPathInside, normalizePath } from './utils/pathMapping';
 
 const COLLAPSE_THRESHOLD = 120;
 const MIN_EDITOR_WIDTH = 300;
@@ -109,37 +108,10 @@ function App() {
     return () => observer.disconnect();
   }, [isEditorCollapsed, explorerWidth, sidebarWidth]);
 
-  // Sync debugStore currentFile to editorStore so the code viewer opens automatically
-  useEffect(() => {
-    let prevCurrentFile: string | undefined = useDebugStore.getState().currentFile;
-    const unsubscribe = useDebugStore.subscribe((state) => {
-      if (state.currentFile && state.currentFile !== prevCurrentFile) {
-        useEditorStore.getState().openFile(state.currentFile);
-      }
-      prevCurrentFile = state.currentFile;
-    });
-    return unsubscribe;
-  }, []);
+  // Debug-stop navigation (opening the stopped file, or showing an
+  // explanatory panel when its source is not available locally) is handled
+  // directly by the debug store in navigateToFrame().
 
-  // When the debugger stops in a file outside the workspace, clear the current
-  // file instead of trying to open a path that does not exist locally.
-  useEffect(() => {
-    const unsubscribe = useDebugStore.subscribe((state) => {
-      const { workspaceRoot } = useConfigStore.getState();
-      if (!state.currentFile || !workspaceRoot) return;
-
-      const normalizedFile = normalizePath(state.currentFile);
-      const normalizedRoot = normalizePath(workspaceRoot);
-      if (!isPathInside(normalizedRoot, normalizedFile)) {
-        useDebugStore.getState().setCurrentLocation(undefined, undefined, state.currentFrameId);
-        console.warn(
-          `Debugger stopped in a file outside the workspace: ${state.currentFile}. ` +
-          'Open the file manually or check your path mappings.'
-        );
-      }
-    });
-    return unsubscribe;
-  }, []);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input, textarea, or contenteditable

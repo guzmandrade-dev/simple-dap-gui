@@ -50,7 +50,7 @@ export function CallStackPanel() {
               <div className="min-w-0">
                 <div className="font-medium truncate">{frame.name}</div>
                 <div className={`text-xs truncate font-mono ${frame.id === currentFrameId ? 'text-accent-text/80' : 'text-text-muted'}`}>
-                  {frame.source?.path ? getFileName(frame.source.path) : 'Unknown'}:{frame.line}
+                  {frame.source?.path ? getFileName(frame.source.path) : frame.source?.name || 'Unknown source'}:{frame.line}
                   {frame.column && frame.column > 0 ? `:${frame.column}` : ''}
                 </div>
               </div>

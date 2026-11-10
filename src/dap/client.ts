@@ -5,13 +5,18 @@ import { ChildProcess } from 'child_process';
 export class DAPClient extends EventEmitter {
   private adapter: ChildProcess | null = null;
   private seq = 0;
-  private pendingRequests = new Map<number, (response: any) => void>();
+  private pendingRequests = new Map<number, { resolve: (response: any) => void; reject: (err: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   private buffer = '';
   private contentLength = -1;
+  private disposed = false;
+
+  constructor(private requestTimeoutMs: number = 10_000) {
+    super();
+  }
 
   async spawn(adapterPath: string, args: string[] = []) {
     const { spawn } = await import('child_process');
-    
+
     this.adapter = spawn(process.execPath, [adapterPath, ...args], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
@@ -22,13 +27,18 @@ export class DAPClient extends EventEmitter {
       console.error('Adapter stderr:', data.toString());
     });
 
-    this.adapter.on('close', () => {
+    this.adapter.on('close', (code) => {
+      this.rejectAllPending(new Error(`Adapter process closed (exit code ${code ?? 'null'})`));
       this.emit('closed');
     });
 
     this.adapter.on('error', (err) => {
       console.error('Adapter error:', err);
-      this.emit('error', err);
+      this.rejectAllPending(err);
+      // EventEmitter throws when 'error' is emitted without listeners; guard it.
+      if (this.listenerCount('error') > 0) {
+        this.emit('error', err);
+      }
     });
   }
 
@@ -37,17 +47,23 @@ export class DAPClient extends EventEmitter {
     this.processBuffer();
   }
 
-  // DAP uses Content-Length header followed by JSON body
+  // DAP uses Content-Length header followed by JSON body. Malformed frames
+  // (e.g. non-DAP noise on stdout) are skipped without crashing the host or
+  // losing subsequent valid frames that share the same chunk.
   private processBuffer() {
-    while (true) {
+    for (;;) {
       if (this.contentLength < 0) {
         const headerEnd = this.buffer.indexOf('\r\n\r\n');
         if (headerEnd === -1) return;
-        
+
         const header = this.buffer.substring(0, headerEnd);
         const match = header.match(/Content-Length: (\d+)/);
-        if (!match) throw new Error('Invalid DAP header');
-        
+        if (!match) {
+          this.buffer = this.buffer.substring(headerEnd + 4);
+          this.emit('protocolError', new Error(`Invalid DAP header: ${header.slice(0, 120)}`));
+          continue;
+        }
+
         this.contentLength = parseInt(match[1], 10);
         this.buffer = this.buffer.substring(headerEnd + 4);
       }
@@ -58,8 +74,12 @@ export class DAPClient extends EventEmitter {
       this.buffer = this.buffer.substring(this.contentLength);
       this.contentLength = -1;
 
-      const message = JSON.parse(messageStr) as DebugProtocol.ProtocolMessage;
-      this.handleMessage(message);
+      try {
+        const message = JSON.parse(messageStr) as DebugProtocol.ProtocolMessage;
+        this.handleMessage(message);
+      } catch (err) {
+        this.emit('protocolError', err);
+      }
     }
   }
 
@@ -76,25 +96,31 @@ export class DAPClient extends EventEmitter {
     };
 
     return new Promise((resolve, reject) => {
-      this.pendingRequests.set(this.seq, resolve);
-      
       const json = JSON.stringify(request);
       const header = `Content-Length: ${Buffer.byteLength(json)}\r\n\r\n`;
-      
-      if (!this.adapter?.stdin) {
+
+      if (this.disposed || !this.adapter?.stdin) {
         reject(new Error('Adapter not connected'));
         return;
       }
-      
-      this.adapter.stdin.write(header + json);
-      
-      // Timeout after 10 seconds
-      setTimeout(() => {
+
+      const timer = setTimeout(() => {
         if (this.pendingRequests.has(this.seq)) {
           this.pendingRequests.delete(this.seq);
           reject(new Error(`Request timeout: ${command}`));
         }
-      }, 10000);
+      }, this.requestTimeoutMs);
+
+      this.pendingRequests.set(this.seq, { resolve, reject, timer });
+
+      this.adapter.stdin.write(header + json, (err) => {
+        if (err && this.pendingRequests.has(this.seq)) {
+          const pending = this.pendingRequests.get(this.seq)!;
+          clearTimeout(pending.timer);
+          this.pendingRequests.delete(this.seq);
+          reject(err);
+        }
+      });
     });
   }
 
@@ -103,8 +129,13 @@ export class DAPClient extends EventEmitter {
       const response = message as DebugProtocol.Response;
       const handler = this.pendingRequests.get(response.request_seq);
       if (handler) {
-        handler(response);
+        clearTimeout(handler.timer);
         this.pendingRequests.delete(response.request_seq);
+        if (response.success === false) {
+          handler.reject(new Error(response.message || `DAP request '${response.command}' failed`));
+        } else {
+          handler.resolve(response);
+        }
       }
     } else if (message.type === 'event') {
       const event = message as DebugProtocol.Event;
@@ -113,21 +144,27 @@ export class DAPClient extends EventEmitter {
     }
   }
 
+  private rejectAllPending(err: Error) {
+    for (const pending of this.pendingRequests.values()) {
+      clearTimeout(pending.timer);
+      pending.reject(err);
+    }
+    this.pendingRequests.clear();
+  }
+
   dispose() {
+    this.disposed = true;
     if (this.adapter) {
-      // Try to send disconnect request first
-      try {
-        this.sendRequest('disconnect', { restart: false });
-      } catch (e) {
-        // Ignore errors during disconnect
-      }
-      
+      // Try to send disconnect request first, but never let a failure here
+      // become an unhandled rejection.
+      this.sendRequest('disconnect', { restart: false }).catch(() => {});
+
       this.adapter.kill();
       this.adapter = null;
     }
-    
-    // Clear any pending requests
-    this.pendingRequests.clear();
+
+    // Reject anything still waiting so callers don't hang until the timeout.
+    this.rejectAllPending(new Error('Client disposed'));
     this.buffer = '';
     this.contentLength = -1;
   }

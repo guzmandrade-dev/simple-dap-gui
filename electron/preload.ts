@@ -52,12 +52,14 @@ export interface ElectronAPI {
   debugSetExceptionBreakpoints: (filters: string[]) => Promise<{ success: boolean }>;
   debugFetchVariables: (variablesReference: number) => Promise<{ success: boolean; variables: unknown[] }>;
   debugEvaluate: (expression: string, frameId?: number) => Promise<{ success: boolean; result: unknown }>;
+  debugFetchSource: (sourceReference: number) => Promise<{ success: boolean; content?: string; mimeType?: string; error?: string }>;
   debugIsActive: () => Promise<boolean>;
   
   // DAP Events
   onDapStopped: (callback: (event: unknown) => void) => () => void;
   onDapStackTrace: (callback: (body: unknown) => void) => () => void;
   onDapScopes: (callback: (body: unknown) => void) => () => void;
+  onDapOutput: (callback: (body: unknown) => void) => () => void;
   onDapVariables: (callback: (data: unknown) => void) => () => void;
   onDapChildVariables: (callback: (data: unknown) => void) => () => void;
   onDapTerminated: (callback: () => void) => () => void;
@@ -169,6 +171,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('debug-fetch-variables', variablesReference),
   debugEvaluate: (expression: string, frameId?: number) =>
     ipcRenderer.invoke('debug-evaluate', expression, frameId),
+  debugFetchSource: (sourceReference: number) =>
+    ipcRenderer.invoke('debug-source', sourceReference),
   debugIsActive: () => ipcRenderer.invoke('debug-is-active'),
   
   // DAP Events
@@ -186,6 +190,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (_event: unknown, data: unknown) => callback(data);
     ipcRenderer.on('dap-scopes', handler);
     return () => ipcRenderer.removeListener('dap-scopes', handler);
+  },
+  onDapOutput: (callback: (body: unknown) => void) => {
+    const handler = (_event: unknown, data: unknown) => callback(data);
+    ipcRenderer.on('dap-output', handler);
+    return () => ipcRenderer.removeListener('dap-output', handler);
   },
   onDapVariables: (callback: (data: unknown) => void) => {
     const handler = (_event: unknown, data: unknown) => callback(data);

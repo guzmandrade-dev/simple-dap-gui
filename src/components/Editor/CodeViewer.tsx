@@ -13,6 +13,7 @@ import 'prismjs/components/prism-markdown';
 import { useEditorStore } from '../../stores/editorStore';
 import { useDebugStore } from '../../stores/debugStore';
 import { getLanguageForFile, fetchFileContent } from '../../utils/fileLoader';
+import { isVirtualSourcePath } from '../../utils/debugNavigation';
 
 interface Settings {
   editorCommand: string;
@@ -115,12 +116,14 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { currentFile, currentLine, fileContents, reloadFile, setCurrentLine } = useEditorStore();
+  const { currentFile, currentLine, fileContents, fileErrors, reloadFile, setCurrentLine } = useEditorStore();
   const {
     isPaused,
     breakpoints,
     setBreakpoint,
     removeBreakpoint,
+    currentSourceUnavailable,
+    fetchAndOpenAdapterSource,
   } = useDebugStore();
 
   // Load settings
@@ -163,28 +166,30 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
     }
   };
 
-  const [fileError, setFileError] = useState<string | null>(null);
-
-  // Load file content
+  // Load file content for files that are selected but not yet in memory
+  // (e.g. opened before this mount, or read races). Errors are tracked in the
+  // editor store so both explorer-opened and debug-opened files show them.
   useEffect(() => {
-    if (!currentFile) return;
-    const loadFile = async () => {
-      try {
-        setFileError(null);
-        const content = await fetchFileContent(currentFile);
-        useEditorStore.setState((state) => ({
-          fileContents: new Map(state.fileContents).set(currentFile, content),
-        }));
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error('Failed to load file:', err);
-        setFileError(message);
-      }
-    };
-    if (!fileContents.has(currentFile)) {
-      loadFile();
+    if (!currentFile || isVirtualSourcePath(currentFile)) return;
+    if (!fileContents.has(currentFile) && !fileErrors.has(currentFile)) {
+      fetchFileContent(currentFile)
+        .then((content) => {
+          useEditorStore.setState((state) => ({
+            fileContents: new Map(state.fileContents).set(currentFile, content),
+          }));
+        })
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error('Failed to load file:', err);
+          useEditorStore.setState((state) => ({
+            fileErrors: new Map(state.fileErrors).set(currentFile, message),
+          }));
+        });
     }
-  }, [currentFile]);
+  }, [currentFile, fileContents, fileErrors]);
+
+  const fileError = currentFile ? fileErrors.get(currentFile) ?? null : null;
+  const isVirtual = currentFile ? isVirtualSourcePath(currentFile) : false;
 
   const rawContent = currentFile ? fileContents.get(currentFile) || '' : '';
   // Strip Windows \r so lines don't end with carriage returns
@@ -193,14 +198,26 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
   const fileBPs = currentFile ? breakpoints.get(currentFile) : undefined;
   const prismLang = useMemo(() => (currentFile ? getPrismLanguage(currentFile) : null), [currentFile]);
 
+  // Memoize syntax highlighting: Prism.highlight per line is expensive and
+  // must not re-run on every render (any store update re-renders this view).
+  const isTruncated = lines.length > MAX_RENDER_LINES;
+  const visibleLines = useMemo(
+    () => (isTruncated ? lines.slice(0, MAX_RENDER_LINES) : lines),
+    [lines, isTruncated]
+  );
+  const highlightedLines = useMemo(
+    () => visibleLines.map((line) => highlightLine(line, prismLang)),
+    [visibleLines, prismLang]
+  );
+
   const toggleBreakpoint = useCallback((line: number) => {
-    if (!currentFile) return;
+    if (!currentFile || isVirtual) return; // adapter-provided source is read-only
     if (fileBPs?.has(line)) {
       removeBreakpoint(currentFile, line);
     } else {
       setBreakpoint(currentFile, line);
     }
-  }, [currentFile, fileBPs, setBreakpoint, removeBreakpoint]);
+  }, [currentFile, isVirtual, fileBPs, setBreakpoint, removeBreakpoint]);
 
   // Scroll current line into view only when it comes from an external jump
   // (e.g. search result or debug stop), not from a user click inside the viewer.
@@ -212,18 +229,75 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
     lastJumpedLineRef.current = currentLine;
     const lineHeight = 20;
     const targetScroll = (currentLine - 1) * lineHeight - scrollRef.current.clientHeight / 2 + lineHeight / 2;
-    scrollRef.current.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+    // jsdom (tests) does not implement scrollTo
+    if (typeof scrollRef.current.scrollTo === 'function') {
+      scrollRef.current.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+    }
   }, [currentLine, lines.length]);
 
   const fileName = currentFile ? currentFile.split(/[\\/]/).pop() : '';
-  const isTruncated = lines.length > MAX_RENDER_LINES;
-  const visibleLines = isTruncated ? lines.slice(0, MAX_RENDER_LINES) : lines;
+
+  // The debugger stopped somewhere whose source is not a local file (e.g. a
+  // file outside the project or on a remote server). Keep the session alive
+  // and explain instead of breaking.
+  if (isPaused && currentSourceUnavailable) {
+    const info = currentSourceUnavailable;
+    const displayName = info.name || info.path?.split(/[\\/]/).pop() || 'Unknown source';
+    return (
+      <div className={`${className} flex flex-col h-full`}>
+        <div className="h-9 bg-bg-secondary border-b border-border-subtle flex items-center justify-between px-3 flex-shrink-0">
+          <span className="text-text-secondary text-sm truncate" title={info.path || info.name}>
+            {displayName}
+            {currentLine ? <span className="text-text-muted">:{currentLine}</span> : null}
+          </span>
+          <span className="text-xs text-warning font-medium">source unavailable</span>
+        </div>
+        <div className="flex-1 flex items-center justify-center bg-bg p-6 overflow-auto">
+          <div className="max-w-lg w-full bg-bg-secondary border border-border-subtle rounded p-4">
+            <div className="flex items-center gap-2 text-warning mb-2">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 1.5L15 14H1L8 1.5z" />
+                <path d="M8 6v4" />
+                <path d="M8 12.5h.01" />
+              </svg>
+              <span className="font-medium">Source not available locally</span>
+            </div>
+            <p className="text-sm text-text-secondary mb-3">
+              The debugger stopped in a file that is not part of the open workspace and cannot be read
+              from disk. The debug session is still active — use Continue or the step controls to keep going.
+            </p>
+            {(info.path || info.name) && (
+              <code className="block text-xs font-mono bg-bg-tertiary p-2 rounded break-all text-text mb-3">
+                {info.path || info.name}
+              </code>
+            )}
+            {info.error && (
+              <p className="text-xs text-text-muted whitespace-pre-wrap mb-3">{info.error}</p>
+            )}
+            {info.sourceReference !== undefined && (
+              <button
+                onClick={() => fetchAndOpenAdapterSource(info.sourceReference!, info.name, currentLine, info.path)}
+                className="btn btn-primary text-xs"
+              >
+                Load source from debug adapter
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentFile) {
     return (
       <div className={`${className} flex items-center justify-center bg-bg text-text-muted`}>
         <div className="text-center">
-          <div className="text-2xl mb-2 text-text-secondary">No file open</div>
+          <svg className="mx-auto mb-3 text-text-muted" width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6l-4-4z" />
+            <path d="M9 2v4h4" />
+            <path d="M5.5 9l1.5 1.5L9.5 8" />
+          </svg>
+          <div className="text-base mb-1 text-text-secondary">No file open</div>
           <div className="text-sm">Open a file from the explorer to view code</div>
         </div>
       </div>
@@ -249,7 +323,7 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
               <span className="font-medium">Unable to open file</span>
             </div>
             <p className="text-sm text-text-secondary mb-3">
-              The debugger reported a file that cannot be read from this workspace:
+              This file cannot be read from disk:
             </p>
             <code className="block text-xs font-mono bg-bg-tertiary p-2 rounded break-all text-text mb-3">
               {currentFile}
@@ -267,23 +341,32 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
     <div className={`${className} h-full flex flex-col`}>
       <div className="h-9 bg-bg-secondary border-b border-border-subtle flex items-center justify-between px-3 flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <button
-            onClick={openInEditor}
-            className="btn btn-ghost text-xs shrink-0"
-            title={`Open in ${settings.editorCommand}`}
-          >
-            <span>Open in Editor</span>
-          </button>
-          <button
-            onClick={() => currentFile && reloadFile(currentFile)}
-            className="btn btn-ghost text-xs shrink-0"
-            title="Reload file from disk"
-          >
-            <span>Reload</span>
-          </button>
+          {!isVirtual && (
+            <>
+              <button
+                onClick={openInEditor}
+                className="btn btn-ghost text-xs shrink-0"
+                title={`Open in ${settings.editorCommand}`}
+              >
+                <span>Open in Editor</span>
+              </button>
+              <button
+                onClick={() => currentFile && reloadFile(currentFile)}
+                className="btn btn-ghost text-xs shrink-0"
+                title="Reload file from disk"
+              >
+                <span>Reload</span>
+              </button>
+            </>
+          )}
           <span className="text-text-secondary text-sm truncate" title={currentFile}>
             {fileName}
           </span>
+          {isVirtual && (
+            <span className="text-xs text-warning bg-current-line px-1.5 py-0.5 rounded" title="This source was provided by the debug adapter and is read-only">
+              adapter source · read-only
+            </span>
+          )}
           {currentLine && <span className="text-xs text-text-muted">:{currentLine}</span>}
         </div>
         <button
@@ -314,13 +397,13 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
                     toggleBreakpoint(lineNum);
                   }}
                   className={`
-                    px-2 cursor-pointer flex items-center justify-end gap-1
+                    px-2 ${isVirtual ? 'cursor-default' : 'cursor-pointer'} flex items-center justify-end gap-1
                     ${isDebugCurrent ? 'bg-current-line text-warning' : ''}
                     ${isCurrent && !isDebugCurrent ? 'bg-current-line-accent text-success font-semibold' : ''}
                     ${!isCurrent ? 'text-text-muted hover:text-text hover:bg-bg-tertiary' : ''}
                   `}
                   style={{ height: '20px' }}
-                  title={hasBP ? 'Remove breakpoint' : 'Add breakpoint'}
+                  title={isVirtual ? 'Breakpoints are not supported in adapter-provided source' : hasBP ? 'Remove breakpoint' : 'Add breakpoint'}
                 >
                   {hasBP && (
                     <span className="inline-block w-2.5 h-2.5 rounded-full bg-danger shrink-0" />
@@ -332,11 +415,11 @@ function CodeViewerInner({ className, onCollapse }: CodeViewerProps) {
           </div>
 
           <div className="flex-1 min-w-0">
-            {visibleLines.map((line, i) => {
+            {visibleLines.map((_, i) => {
               const lineNum = i + 1;
               const isCurrent = currentLine === lineNum;
               const isDebugCurrent = isCurrent && isPaused;
-              const highlighted = highlightLine(line, prismLang);
+              const highlighted = highlightedLines[i];
 
               return (
                 <div

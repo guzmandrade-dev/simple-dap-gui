@@ -48,22 +48,27 @@ export class DebugSession {
     if (this.isInitialized) return;
     this.isInitialized = true;
 
-    // Send all pending breakpoints that were queued before initialization
-    for (const [filePath, lines] of this.pendingBreakpoints) {
-      await this.setBreakpoints(filePath, lines);
+    try {
+      // Send all pending breakpoints that were queued before initialization
+      for (const [filePath, lines] of this.pendingBreakpoints) {
+        await this.setBreakpoints(filePath, lines);
+      }
+      this.pendingBreakpoints.clear();
+
+      // Send pending exception breakpoints
+      if (this.pendingExceptionBreakpoints) {
+        await this.setExceptionBreakpoints(this.pendingExceptionBreakpoints);
+        this.pendingExceptionBreakpoints = null;
+      }
+
+      // Notify adapter that configuration is complete so it can start executing
+      await this.client.sendRequest('configurationDone');
+    } catch (error) {
+      console.error('Error during configurationDone sequence:', error);
+    } finally {
+      // Always release start() so it never hangs waiting for this event.
+      this.initializedResolve();
     }
-    this.pendingBreakpoints.clear();
-
-    // Send pending exception breakpoints
-    if (this.pendingExceptionBreakpoints) {
-      await this.setExceptionBreakpoints(this.pendingExceptionBreakpoints);
-      this.pendingExceptionBreakpoints = null;
-    }
-
-    // Notify adapter that configuration is complete so it can start executing
-    await this.client.sendRequest('configurationDone');
-
-    this.initializedResolve();
   }
 
   private expandConfig(): LaunchConfiguration {
@@ -101,54 +106,68 @@ export class DebugSession {
   async start(adapterPath: string) {
     await this.client.spawn(adapterPath);
 
-    // Expand local filesystem variables in the config before sending it to the
-    // adapter. The adapter doesn't understand ${userHome}/${workspaceFolder}/etc.
-    const expandedConfig = this.expandConfig();
+    try {
+      // Expand local filesystem variables in the config before sending it to the
+      // adapter. The adapter doesn't understand ${userHome}/${workspaceFolder}/etc.
+      const expandedConfig = this.expandConfig();
 
-    // Initialize sequence
-    await this.client.sendRequest('initialize', {
-      clientID: 'simple-dap-gui',
-      clientName: 'simple-dap-gui',
-      adapterID: expandedConfig.type,
-      pathFormat: 'path',
-      linesStartAt1: true,
-      columnsStartAt1: true,
-      supportsVariableType: true,
-      supportsRunInTerminalRequest: false,
-    }) as DebugProtocol.InitializeResponse;
+      // Initialize sequence
+      await this.client.sendRequest('initialize', {
+        clientID: 'simple-dap-gui',
+        clientName: 'simple-dap-gui',
+        adapterID: expandedConfig.type,
+        pathFormat: 'path',
+        linesStartAt1: true,
+        columnsStartAt1: true,
+        supportsVariableType: true,
+        supportsRunInTerminalRequest: false,
+      }) as DebugProtocol.InitializeResponse;
 
-    if (expandedConfig.request === 'launch') {
-      await this.client.sendRequest('launch', expandedConfig);
-    } else {
-      await this.client.sendRequest('attach', expandedConfig);
+      if (expandedConfig.request === 'launch') {
+        await this.client.sendRequest('launch', expandedConfig);
+      } else {
+        await this.client.sendRequest('attach', expandedConfig);
+      }
+
+      // Wait for the adapter to emit 'initialized' and for us to send 'configurationDone'
+      await this.initializedPromise;
+    } catch (error) {
+      // Don't leave a zombie adapter process behind when startup fails.
+      this.client.dispose();
+      throw error;
     }
-
-    // Wait for the adapter to emit 'initialized' and for us to send 'configurationDone'
-    await this.initializedPromise;
   }
 
   private async onStopped(event: DebugProtocol.StoppedEvent['body']) {
     this.currentThreadId = event.threadId;
 
-    // Always fetch stack trace on stop
-    if (event.threadId) {
+    // Emit the stopped event first so the UI always marks the session as
+    // paused, even if fetching the stack trace fails afterwards (e.g. the
+    // adapter cannot resolve the stopped location). The session must stay
+    // usable (continue/step) in that case.
+    this.client.emit('stoppedEvent', event);
+
+    if (!event.threadId) return;
+
+    try {
       const stack = await this.client.sendRequest('stackTrace', {
         threadId: event.threadId,
         startFrame: 0,
         levels: 20,
       }) as DebugProtocol.StackTraceResponse;
 
-      // Emit for UI
-      this.client.emit('stackTrace', stack.body);
+      const body = stack.body ?? { stackFrames: [], totalFrames: 0 };
+      this.client.emit('stackTrace', body);
 
       // Fetch variables for top frame
-      if (stack.body.stackFrames.length > 0) {
-        await this.fetchVariables(stack.body.stackFrames[0].id);
+      if (body.stackFrames.length > 0) {
+        await this.fetchVariables(body.stackFrames[0].id);
       }
+    } catch (error) {
+      // Never let a failed stackTrace kill the session; report an empty stack.
+      console.error('Error fetching stack trace after stop:', error);
+      this.client.emit('stackTrace', { stackFrames: [], totalFrames: 0 });
     }
-
-    // Emit stopped event for store
-    this.client.emit('stoppedEvent', event);
   }
 
   private async fetchVariables(frameId: number) {
@@ -158,10 +177,11 @@ export class DebugSession {
         frameId: frameId,
       }) as DebugProtocol.ScopesResponse;
 
-      this.client.emit('scopes', scopesResponse.body);
+      const scopesBody = scopesResponse.body ?? { scopes: [] };
+      this.client.emit('scopes', scopesBody);
 
       // Fetch variables for each scope
-      for (const scope of scopesResponse.body.scopes) {
+      for (const scope of scopesBody.scopes) {
         if (scope.variablesReference > 0) {
           const varsResponse = await this.client.sendRequest('variables', {
             variablesReference: scope.variablesReference,
@@ -170,13 +190,28 @@ export class DebugSession {
           this.client.emit('variables', {
             frameId: frameId,
             scopeId: scope.variablesReference,
-            variables: varsResponse.body.variables,
+            variables: varsResponse.body?.variables ?? [],
           });
         }
       }
     } catch (error) {
       console.error('Error fetching variables:', error);
     }
+  }
+
+  /**
+   * Fetch source content directly from the adapter via the DAP `source`
+   * request. Used when a stopped frame references a source that has no local
+   * file (sourceReference > 0, no path) — e.g. code outside the workspace.
+   */
+  async fetchSource(sourceReference: number): Promise<{ content: string; mimeType?: string }> {
+    const response = await this.client.sendRequest('source', {
+      sourceReference,
+    }) as DebugProtocol.SourceResponse;
+    return {
+      content: response.body?.content ?? '',
+      mimeType: response.body?.mimeType,
+    };
   }
 
   private onOutput(event: DebugProtocol.OutputEvent['body']) {
@@ -207,10 +242,14 @@ export class DebugSession {
     // Convert local path to server path if needed
     const serverPath = this.localToServerPath(filePath);
 
-    await this.client.sendRequest('setBreakpoints', {
-      source: { path: serverPath },
-      breakpoints: lines.map(line => ({ line })),
-    });
+    try {
+      await this.client.sendRequest('setBreakpoints', {
+        source: { path: serverPath },
+        breakpoints: lines.map(line => ({ line })),
+      });
+    } catch (error) {
+      console.error(`Failed to set breakpoints in ${serverPath}:`, error);
+    }
   }
 
   async setExceptionBreakpoints(filters: string[]) {
@@ -219,61 +258,65 @@ export class DebugSession {
       return;
     }
 
-    await this.client.sendRequest('setExceptionBreakpoints', {
-      filters,
-    });
+    try {
+      await this.client.sendRequest('setExceptionBreakpoints', {
+        filters,
+      });
+    } catch (error) {
+      console.error('Failed to set exception breakpoints:', error);
+    }
   }
 
   async stepOver() {
-    if (this.currentThreadId) {
-      await this.client.sendRequest('next', {
-        threadId: this.currentThreadId,
-      });
-    }
+    await this.guarded('next');
   }
 
   async stepInto() {
-    if (this.currentThreadId) {
-      await this.client.sendRequest('stepIn', {
-        threadId: this.currentThreadId,
-      });
-    }
+    await this.guarded('stepIn');
   }
 
   async stepOut() {
-    if (this.currentThreadId) {
-      await this.client.sendRequest('stepOut', {
-        threadId: this.currentThreadId,
-      });
-    }
+    await this.guarded('stepOut');
   }
 
   async continue() {
-    if (this.currentThreadId) {
-      await this.client.sendRequest('continue', {
-        threadId: this.currentThreadId,
-      });
-    }
+    await this.guarded('continue');
   }
 
   async pause(threadId?: number) {
     const targetThreadId = threadId || this.currentThreadId;
     if (targetThreadId) {
-      await this.client.sendRequest('pause', {
-        threadId: targetThreadId,
+      await this.guarded('pause', { threadId: targetThreadId });
+    }
+  }
+
+  // Run a stepping/continue request without ever throwing into the event
+  // handler chain — a failed request must not break the session UI.
+  private async guarded(command: 'next' | 'stepIn' | 'stepOut' | 'continue' | 'pause', extraArgs: Record<string, unknown> = {}) {
+    if (!this.currentThreadId && command !== 'pause') return;
+    try {
+      await this.client.sendRequest(command as 'next', {
+        threadId: this.currentThreadId,
+        ...extraArgs,
       });
+    } catch (error) {
+      console.error(`DAP '${command}' request failed:`, error);
     }
   }
 
   async fetchChildVariables(variablesReference: number) {
-    const response = await this.client.sendRequest('variables', {
-      variablesReference,
-    }) as DebugProtocol.VariablesResponse;
+    try {
+      const response = await this.client.sendRequest('variables', {
+        variablesReference,
+      }) as DebugProtocol.VariablesResponse;
 
-    this.client.emit('childVariables', {
-      variablesReference,
-      variables: response.body.variables,
-    });
+      this.client.emit('childVariables', {
+        variablesReference,
+        variables: response.body?.variables ?? [],
+      });
+    } catch (error) {
+      console.error('Error fetching child variables:', error);
+    }
   }
 
   async evaluate(expression: string, frameId?: number) {
@@ -283,14 +326,15 @@ export class DebugSession {
       context: 'watch',
     }) as DebugProtocol.EvaluateResponse;
 
+    const body = response.body ?? { result: '', variablesReference: 0 };
     this.client.emit('evaluate', {
       expression,
-      result: response.body.result,
-      type: response.body.type,
-      variablesReference: response.body.variablesReference,
+      result: body.result,
+      type: body.type,
+      variablesReference: body.variablesReference,
     });
 
-    return response.body;
+    return body;
   }
 
   async disconnect(restart?: boolean, terminateDebuggee?: boolean) {
