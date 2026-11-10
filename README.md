@@ -18,6 +18,9 @@ A standalone DAP (Debug Adapter Protocol) client GUI application built with Elec
 - **Call Stack View**: Navigate through the call stack during debugging — click any frame to jump to its source
 - **Variables Panel**: Inspect variables at different scopes with expandable children
 - **Watch Panel**: Evaluate and monitor custom expressions while debugging
+- **Console Panel**: See the debuggee's stdout/stderr live in the Console tab, with a capped, clearable buffer
+- **Graceful stops outside the workspace**: When the debugger stops in a file that is not part of the project (or not on disk), the session stays alive — the editor shows an explanatory panel and, when the adapter supports it, can fetch the source directly via the DAP `source` request and display it read-only
+- **Search options**: File search (Ctrl+P) and content search (Ctrl+Shift+F) with case-sensitive and regex toggles for content search
 - **Dark/Light Theme**: Toggle between dark and light editor themes via settings
 - **Debug Adapter Management**: Built-in manager to install/uninstall DAP adapters (custom .vsix install supported)
 - **App Logo & Icons**: Simple code-brackets SVG brand mark, generated as PNG/ICO assets for all platforms

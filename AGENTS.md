@@ -1,0 +1,71 @@
+# AGENTS.md — simple-dap-gui
+
+A standalone DAP (Debug Adapter Protocol) client GUI: Electron main process + React/TS renderer + PrismJS code viewer. Primary target is PHP/Xdebug (`vscode-php-debug`), but any DAP adapter works (custom `.vsix` install supported).
+
+## Commands
+
+```bash
+npm run dev              # vite dev server + electron (vite-plugin-electron)
+npm test                 # vitest run (jsdom env, globals on)
+npm run lint             # eslint src electron --ext ts,tsx --max-warnings 0
+npm run build:renderer   # tsc --noEmit && vite build (renderer + electron bundles, no packaging)
+npm run build            # + electron-builder packaging (downloads Electron dist)
+```
+
+- Config for ESLint lives in `.eslintrc.cjs` (ESLint 8, eslintrc format — do not migrate to flat config without upgrading ESLint).
+- `vite build` prints a benign `Unknown input options: platform` warning from vite-plugin-electron v1 internals — ignore it.
+- In sandboxes where npm blocks install scripts, `electron`'s postinstall (binary download) may be skipped; builds/tests still work, but `npm run dev` / packaging need the binary (`npm approve-scripts` or run install with scripts allowed).
+
+## Architecture map
+
+```
+electron/main.ts       # main process: window, menu, IPC handlers, DebugSessionManager, adapter install
+ electron/preload.ts    # contextBridge -> window.electronAPI (keep in sync with src/types/electron.d.ts!)
+ electron/search.ts     # file index + ripgrep (falls back to pure-JS search), exports IGNORED_DIRS
+src/dap/client.ts      # DAPClient: Content-Length framed JSON-RPC over adapter stdio (EventEmitter)
+src/dap/session.ts     # DebugSession: launch/attach handshake, breakpoints, stepping, path mapping
+src/stores/            # zustand: debugStore (session state), editorStore (open files/contents/errors), configStore
+src/components/        # Editor/CodeViewer, Panels/* (Sidebar tabs), Search/SearchModal, Toolbar, StatusBar, TitleBar
+src/utils/             # pathMapping, fileLoader, search, debugNavigation, adapterManager
+src/styles/            # theme.css + theme-dark/light.css — ALL colors via CSS custom properties
+```
+
+Data flow on a debug stop: adapter → `DAPClient` event → `DebugSession.onStopped` (fetches stackTrace/scopes/variables) → main maps paths via `serverToLocalPath` → IPC `dap-stack-trace` → `debugStore.onStackTrace` → `navigateToFrame()` → editorStore/CodeViewer.
+
+## Hard invariants (learned the hard way)
+
+1. **A debug stop must never kill or wedge the session.** When the stopped frame's file is not on disk (out-of-project/remote), `navigateToFrame()` (in `debugStore.ts`) classifies via `classifyStopSource()` (`src/utils/debugNavigation.ts`): local file → open; missing + `sourceReference > 0` → `debugFetchSource` IPC → DAP `source` request → show as read-only virtual file `dap://source/<ref>/<name>`; else → `currentSourceUnavailable` panel in CodeViewer. Session stays paused and continuable in all cases.
+2. **`DAPClient` robustness:** `sendRequest` rejects on `success: false` and on timeout; malformed frames are skipped (never throw in a stream handler); pending requests are rejected on adapter `close`/`dispose`; `error` event is only emitted when a listener exists. `DebugSession.onStopped` emits `stoppedEvent` before fetching the stack trace and always emits a (possibly empty) `stackTrace`. Main process has an `unhandledRejection` logger as a safety net.
+3. **Keep `electron/preload.ts` and `src/types/electron.d.ts` in sync** — every IPC channel is declared in both.
+4. **React StrictMode double-runs effects in dev**: `debugStore.initialize()` is guarded by a module-level `dapListenersRegistered` flag — don't register IPC listeners in unguarded effects.
+5. **Zustand `Map` state must be copied** (`new Map(m)`) when mutating before `set()`.
+6. Virtual (`dap://`) paths are read-only: `editorStore.openFile`/`reloadFile` skip disk for them; breakpoint gutter is disabled on them in CodeViewer.
+
+## Dependency pins (intentional — don't "fix" these blindly)
+
+- **TypeScript ^5.9** (not 7 — v7 is the native tsgo port, unverified here).
+- **Tailwind ^3.4** with `tailwind.config.js` + postcss (v4 needs `@tailwindcss/postcss` migration).
+- **ESLint ^8.57** with `.eslintrc.cjs` (v9+/10 need flat config); `@typescript-eslint` ^8 works with ESLint 8.
+- **fuzzysort ^3** (v4 is ESM-only; risky inside the CJS electron main bundle).
+- **vite ^7 + vite-plugin-electron ^1.2 + vite-plugin-electron-renderer ^1.0**: the v1 array form `electron([{ entry, onstart }])` still works and outputs CJS to `dist-electron/` (sandboxed preload requires CJS). React 19, zustand 5, Electron 45, electron-builder 26, vitest 5 + jsdom 31 are verified working together.
+
+## Testing conventions
+
+- Vitest, `environment: 'jsdom'`, `globals: true`; includes `src/**/*.test.ts(x)` **and** `electron/**/*.test.ts` (see `vitest.config.ts`).
+- Mock `window.electronAPI` per test file and reset zustand stores with `setState(...)` in `beforeEach`.
+- `src/dap/client.test.ts` + `session.integration.test.ts` spawn a real mock adapter (a temp `.js` file speaking Content-Length DAP over stdio) — reuse that pattern for protocol-level tests.
+- jsdom has no `scrollTo` — CodeViewer guards it; keep that guard when touching scroll code.
+- Run the full trio before committing: `npx tsc --noEmit && npm run lint && npx vitest run`.
+
+## Design system
+
+- Monochrome tool UI, single accent, flat borderless chrome; icons are inline SVG, stroke 1.5 (empty-state icons 0.9). Theme tokens are CSS custom properties in `src/styles/theme-dark.css` / `theme-light.css` (defaults in `theme.css`).
+- **Contrast floor: muted/secondary small text ≥ 4.5:1 on bg/bg-secondary/bg-tertiary** (dark muted `#848d99`, light muted `#646b78`). Verify with a luminance calc when changing tokens.
+- The `impeccable` skill is available for UI work: incumbent code is the design authority (no PRODUCT.md/DESIGN.md — narrow refinements allowed). After UI edits run `impeccable detect --json <changed tsx files>`; expect `[]`.
+
+## Known limitations / open items
+
+- The GUI was last verified via typecheck/lint/tests/production build in a headless sandbox — do a manual `npm run dev` smoke test, especially stopping in a vendor/remote file.
+- `FileExplorer` only reloads on the `folder-opened` event, not `workspace-changed`.
+- Content search prefers ripgrep (`rg`) and falls back to a pure-JS walker (2 MB/file cap, 200 results) — JS fallback is what `electron/search.test.ts` exercises.
+- Threads are single-threaded in practice (`threads` state is unused); multi-thread UI is a possible future feature.
