@@ -201,9 +201,14 @@ export function FileExplorer({ className, onFileSelect }: FileExplorerProps) {
           <h3 className="text-xs font-medium text-text-muted uppercase">Explorer</h3>
         </div>
         <div className="flex-1 flex items-center justify-center text-text-muted text-sm p-4 text-center">
-          No folder opened
-          <br />
-          <span className="text-xs">Use File → Open Folder</span>
+          <div>
+            <svg className="mx-auto mb-2 text-text-muted" width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 3h4l2 2h6v8H2V3z" />
+            </svg>
+            No folder opened
+            <br />
+            <span className="text-xs">Use File → Open Folder</span>
+          </div>
         </div>
       </div>
     );

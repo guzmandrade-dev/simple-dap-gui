@@ -11,8 +11,16 @@ function LogoIcon({ className }: { className?: string }) {
   );
 }
 
+// Detect macOS from the user agent so we don't rely on a Node `process`
+// shim in the sandboxed renderer.
+function isMacPlatform(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /mac/i.test(navigator.userAgent) || /mac/i.test(navigator.platform || '');
+}
+
 export function TitleBar() {
   const [isMaximized, setIsMaximized] = useState(false);
+  const isMac = isMacPlatform();
 
   useEffect(() => {
     // Could query the main process for initial maximized state if desired.
@@ -41,7 +49,7 @@ export function TitleBar() {
       </div>
 
       {/* On macOS the native traffic lights are shown; hide custom controls. */}
-      {typeof process !== 'undefined' && process.platform !== 'darwin' && (
+      {!isMac && (
       <div className="flex items-center app-no-drag-region">
         <button
           onClick={handleMinimize}

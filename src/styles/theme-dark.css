@@ -6,7 +6,7 @@
   --color-bg-hover: #2a2f38;
   --color-text: #f0f1f3;
   --color-text-secondary: #a8adb8;
-  --color-text-muted: #6b7280;
+  --color-text-muted: #848d99;
   --color-border: #2c3038;
   --color-border-subtle: #1f2229;
   --color-accent: #4f8ef7;
@@ -21,7 +21,7 @@
   --color-current-line: rgba(232, 161, 58, 0.16);
   --color-current-line-accent: rgba(79, 142, 247, 0.18);
 
-  --syntax-comment: #6b7280;
+  --syntax-comment: #848d99;
   --syntax-punctuation: #a8adb8;
   --syntax-keyword: #7dd3fc;
   --syntax-string: #a5d6a7;
