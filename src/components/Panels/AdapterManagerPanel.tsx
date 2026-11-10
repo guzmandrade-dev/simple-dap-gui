@@ -28,7 +28,7 @@ export function AdapterManagerPanel() {
       if (catalog) {
         setAdapters(catalog);
       }
-    } catch (err) {
+    } catch {
       setError('Failed to load adapter catalog');
     } finally {
       setIsLoading(false);

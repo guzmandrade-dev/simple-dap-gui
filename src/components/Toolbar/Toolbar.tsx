@@ -146,7 +146,7 @@ export function Toolbar() {
 
     try {
       await window.electronAPI?.createDirectory?.(vscodeDir);
-    } catch (e) {
+    } catch {
       // Directory may already exist
     }
 

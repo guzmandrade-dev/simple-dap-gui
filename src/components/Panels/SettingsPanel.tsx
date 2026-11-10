@@ -233,7 +233,7 @@ export function SettingsPanel() {
               onChange={(e) => setSettings({ ...settings, globalLaunchConfigJson: e.target.value })}
               className="w-full font-mono text-xs bg-elevated text-text border border-border rounded p-2 resize-y"
               rows={8}
-              placeholder={`{\n  \"configurations\": [\n    {\n      \"name\": \"Global PHP Listen\",\n      \"type\": \"php\",\n      \"request\": \"launch\",\n      \"port\": 9003\n    }\n  ]\n}`}
+              placeholder={'{\n  "configurations": [\n    {\n      "name": "Global PHP Listen",\n      "type": "php",\n      "request": "launch",\n      "port": 9003\n    }\n  ]\n}'}
             />
             <p className="text-xs text-text-muted mt-1">
               JSON in the same format as <code className="bg-bg-tertiary px-1 rounded">.vscode/launch.json</code>. These configurations appear in the debug dropdown for every workspace.
