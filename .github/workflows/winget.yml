@@ -12,5 +12,9 @@ jobs:
         uses: vedantmgoyal9/winget-releaser@main
         with:
           identifier: guzmandrade-dev.simple-dap-gui
-          installers-regex: '\.exe$|\.msi$'
+          # electron-builder also emits legacy-named duplicates (simple-dap-gui.Setup.<v>.exe,
+          # simple-dap-gui.<v>.exe); matching them creates duplicate x64 installer entries that
+          # fail winget validation (DuplicateInstallerEntry). Match only canonical names:
+          # simple-dap-gui-Setup-<version>.exe (NSIS) and simple-dap-gui-<version>.exe (portable).
+          installers-regex: '^simple-dap-gui-(Setup-)?[0-9].*\.exe$'
           token: ${{ secrets.WINGET_TOKEN }}
