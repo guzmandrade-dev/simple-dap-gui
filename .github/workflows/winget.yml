@@ -17,4 +17,8 @@ jobs:
           # fail winget validation (DuplicateInstallerEntry). Match only canonical names:
           # simple-dap-gui-Setup-<version>.exe (NSIS) and simple-dap-gui-<version>.exe (portable).
           installers-regex: '^simple-dap-gui-(Setup-)?[0-9].*\.exe$'
+          # Pin it explicitly: komac only emits ReleaseNotesUrl when the release has a body,
+          # and an empty release body made the 0.5.0 PR trigger "missing ReleaseNotesUrl"
+          # consistency warnings vs the published 0.4.7 manifest.
+          release-notes-url: https://github.com/${{ github.repository }}/releases/tag/${{ github.event.release.tag_name }}
           token: ${{ secrets.WINGET_TOKEN }}
